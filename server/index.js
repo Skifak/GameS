@@ -21,7 +21,7 @@ const logger = winston.createLogger({
 let redisClient;
 async function initRedis() {
     redisClient = createClient({
-        url: "redis://redis:6379"  // Изменено с localhost на redis для docker
+        url: "redis://redis:6379"  // Изменено с localhost на redis для docker.
     });
     redisClient.on("error", (err) => logger.error("Redis Client Error", err));
     try {
