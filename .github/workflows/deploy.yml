@@ -14,7 +14,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
-        node-version: 20
+        node-version: 18
 
     - name: Install dependencies
       run: npm install
@@ -28,11 +28,9 @@ jobs:
       run: |
         echo "$DEPLOY_KEY" > deploy_key
         chmod 600 deploy_key
-        # Копируем весь проект (включая package.json)
-        scp -o StrictHostKeyChecking=no -i deploy_key -r package.json dist server root@150.241.69.143:/opt/serv-game/
+        scp -o StrictHostKeyChecking=no -i deploy_key -r package.json dist server docker-compose.yml Dockerfile root@150.241.69.143:/opt/serv-game/
         ssh -o StrictHostKeyChecking=no -i deploy_key root@150.241.69.143 << 'EOF'
           cd /opt/serv-game
-          npm install
-          pm2 restart gamest-server || pm2 start server/index.js --name gamest-server
+          docker-compose up -d --build
         EOF
         rm deploy_key
