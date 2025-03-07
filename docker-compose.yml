@@ -45,5 +45,7 @@ services:
     command: -config.file=/etc/loki/loki-config.yml
     volumes:
       - ./loki-config.yml:/etc/loki/loki-config.yml
+      - loki-data:/loki
 volumes:
   grafana-storage: {}
+  loki-data: {}
