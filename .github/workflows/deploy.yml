@@ -29,7 +29,7 @@ jobs:
         echo "$DEPLOY_KEY" > deploy_key
         chmod 600 deploy_key
         # Копируем весь проект (включая package.json)
-        scp -o StrictHostKeyChecking=no -i deploy_key package.json dist server root@150.241.69.143:/opt/serv-game/
+        scp -o StrictHostKeyChecking=no -i deploy_key -r package.json dist server root@150.241.69.143:/opt/serv-game/
         ssh -o StrictHostKeyChecking=no -i deploy_key root@150.241.69.143 << 'EOF'
           cd /opt/serv-game
           npm install
