@@ -8,10 +8,12 @@ services:
       - "2567:2567"
     depends_on:
       - redis
+      - nats
     volumes:
       - ./logs:/app/logs
     environment:
       - NODE_ENV=development
+      - NATS_URL=nats://nats:4222
   redis:
     image: "redis:latest"
     ports:
@@ -46,6 +48,53 @@ services:
     volumes:
       - ./loki-config.yml:/etc/loki/loki-config.yml
       - loki-data:/loki
+
+  # Nginx
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"    # HTTP
+      - "443:443"  # HTTPS (если настроишь SSL)
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf  # Файл конфигурации Nginx
+    depends_on:
+      - game-server
+      - pocketbase
+
+  # NATS
+  nats:
+    image: nats:latest
+    ports:
+      - "4222:4222"  # Клиентский порт
+      - "8222:8222"  # Мониторинг (опционально)
+    command: "--jetstream"  # Включаем JetStream для продвинутых функций
+
+  # PocketBase
+  pocketbase:
+    image: ghcr.io/muchobien/pocketbase:latest  # Официальный образ
+    ports:
+      - "8090:8090"  # PocketBase по умолчанию на 8090
+    volumes:
+      - pocketbase-data:/pb_data  # Данные SQLite
+      - pocketbase-migrations:/pb_migrations  # Миграции (опционально)
+    command: --http="0.0.0.0:8090"  # Указываем порт и хост
+
+  # PM2 (опционально, если нужно запускать приложение через PM2)
+  pm2-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.pm2  # Отдельный Dockerfile для PM2
+    depends_on:
+      - redis
+      - nats
+    volumes:
+      - ./logs:/app/logs
+    environment:
+      - NODE_ENV=development
+      - NATS_URL=nats://nats:4222
+
 volumes:
   grafana-storage: {}
   loki-data: {}
+  pocketbase-data: {}
+  pocketbase-migrations: {}
