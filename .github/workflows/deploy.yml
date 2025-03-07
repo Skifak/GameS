@@ -14,7 +14,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
-        node-version: 18
+        node-version: 20
 
     - name: Install dependencies
       run: npm install
@@ -33,6 +33,6 @@ jobs:
         ssh -o StrictHostKeyChecking=no -i deploy_key root@150.241.69.143 << 'EOF'
           cd /opt/serv-game
           npm install
-          pm2 restart game-server || pm2 start server/index.js --name game-server
+          pm2 restart gamest-server || pm2 start server/index.js --name gamest-server
         EOF
         rm deploy_key
