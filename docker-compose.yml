@@ -77,7 +77,7 @@ services:
     volumes:
       - pocketbase-data:/pb_data  # Данные SQLite
       - pocketbase-migrations:/pb_migrations  # Миграции (опционально)
-    command: --http="0.0.0.0:8090"  # Указываем порт и хост
+    command: --http="0.0.0.0:8090"  
 
 volumes:
   grafana-storage: {}
