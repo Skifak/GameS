@@ -29,7 +29,7 @@ jobs:
         echo "$DEPLOY_KEY" > deploy_key
         chmod 600 deploy_key
         scp -o StrictHostKeyChecking=no -i deploy_key -r dist server root@150.241.69.143:/opt/serv-game/
-        scp -o StrictHostKeyChecking=no -i deploy_key package.json docker-compose.yml Dockerfile prometheus.yml loki-config.yml root@150.241.69.143:/opt/serv-game/
+        scp -o StrictHostKeyChecking=no -i deploy_key package.json docker-compose.yml Dockerfile prometheus.yml loki-config.yml nginx.conf root@150.241.69.143:/opt/serv-game/
         ssh -o StrictHostKeyChecking=no -i deploy_key root@150.241.69.143 << 'EOF'
           cd /opt/serv-game
           docker-compose up -d --build
