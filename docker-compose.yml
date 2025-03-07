@@ -1,0 +1,18 @@
+services:
+  game-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "2567:2567"
+    depends_on:
+      - redis
+    volumes:
+      - ./logs:/app/logs
+    environment:
+      - NODE_ENV=development
+
+  redis:
+    image: "redis:latest"
+    ports:
+      - "6379:6379"
