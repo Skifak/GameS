@@ -6,4 +6,7 @@ scrape_configs:
       - targets: ["redis-exporter:9121"]
   - job_name: "game-server"
     static_configs:
-      - targets: ["game-server:9567"]
+      - targets: ["game-server:2567"]
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["150.241.69.143:9090"]

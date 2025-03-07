@@ -27,11 +27,23 @@ services:
       - "9121:9121"
     environment:
       - REDIS_ADDR=redis:6379
+    depends_on:
+      - redis
   grafana:
     image: grafana/grafana:latest
     ports:
       - "3000:3000"
     volumes:
       - grafana-storage:/var/lib/grafana
+    depends_on:
+      - prometheus
 volumes:
   grafana-storage: {}
+  
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./loki-config.yml:/etc/loki/loki-config.yml

@@ -4,6 +4,7 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { monitor } from "@colyseus/monitor";
 import winston from "winston";
 import { createClient } from "redis";
+import LokiTransport from "winston-loki";
 
 const logger = winston.createLogger({
     level: "info",
@@ -14,7 +15,13 @@ const logger = winston.createLogger({
     transports: [
         new winston.transports.Console(),
         new winston.transports.File({ filename: "logs/error.log", level: "error" }),
-        new winston.transports.File({ filename: "logs/combined.log" })
+        new winston.transports.File({ filename: "logs/combined.log" }),
+        new LokiTransport({
+            host: "http://loki:3100",
+            labels: { app: "game-server" },
+            json: true,
+            onConnectionError: (err) => console.error("Loki connection error:", err)
+        })
     ]
 });
 
@@ -49,6 +56,26 @@ class HexRoom extends Room {
         }
     }
 }
+
+// Эндпоинт для метрик Prometheus
+app.get("/metrics", (req, res) => {
+    const rooms = gameServer.rooms || []; // Получаем список комнат
+    let metrics = "";
+    metrics += `# HELP colyseus_rooms_total Total number of active rooms\n`;
+    metrics += `# TYPE colyseus_rooms_total gauge\n`;
+    metrics += `colyseus_rooms_total ${rooms.length}\n`;
+
+    let totalClients = 0;
+    rooms.forEach((room) => {
+        totalClients += room.clients.length;
+    });
+    metrics += `# HELP colyseus_clients_total Total number of connected clients\n`;
+    metrics += `# TYPE colyseus_clients_total gauge\n`;
+    metrics += `colyseus_clients_total ${totalClients}\n`;
+
+    res.set("Content-Type", "text/plain");
+    res.send(metrics);
+});
 
 (async () => {
     await initRedis();
