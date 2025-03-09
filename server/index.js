@@ -5,6 +5,10 @@ import { monitor } from "@colyseus/monitor";
 import winston from "winston";
 import { createClient } from "redis";
 import LokiTransport from "winston-loki";
+import http from "http";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const logger = winston.createLogger({
     level: "info",
@@ -28,7 +32,7 @@ const logger = winston.createLogger({
 let redisClient;
 async function initRedis() {
     redisClient = createClient({
-        url: "redis://redis:6379"  // Изменено с localhost на redis для docker.
+        url: process.env.REDIS_URL || "redis://redis:6379"
     });
     redisClient.on("error", (err) => logger.error("Redis Client Error", err));
     try {
@@ -41,7 +45,8 @@ async function initRedis() {
 }
 
 const app = express();
-const transport = new WebSocketTransport({ server: app.listen(2567) });
+const server = http.createServer(app);
+const transport = new WebSocketTransport({ server });
 const gameServer = new Server({ transport });
 
 class HexRoom extends Room {
@@ -57,22 +62,13 @@ class HexRoom extends Room {
     }
 }
 
-// Эндпоинт для метрик Prometheus
 app.get("/metrics", (req, res) => {
-    const rooms = gameServer.rooms || []; // Получаем список комнат
+    // Временное решение без gameServer.rooms
+    const totalClients = gameServer.transport.ws.clients.size;
     let metrics = "";
-    metrics += `# HELP colyseus_rooms_total Total number of active rooms\n`;
-    metrics += `# TYPE colyseus_rooms_total gauge\n`;
-    metrics += `colyseus_rooms_total ${rooms.length}\n`;
-
-    let totalClients = 0;
-    rooms.forEach((room) => {
-        totalClients += room.clients.length;
-    });
     metrics += `# HELP colyseus_clients_total Total number of connected clients\n`;
     metrics += `# TYPE colyseus_clients_total gauge\n`;
     metrics += `colyseus_clients_total ${totalClients}\n`;
-
     res.set("Content-Type", "text/plain");
     res.send(metrics);
 });
@@ -81,5 +77,5 @@ app.get("/metrics", (req, res) => {
     await initRedis();
     gameServer.define("hex", HexRoom);
     app.use("/colyseus", monitor());
-    console.log("Colyseus server running on port 2567");
+    server.listen(2567, () => console.log("Colyseus server running on port 2567"));
 })();

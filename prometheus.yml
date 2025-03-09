@@ -9,4 +9,4 @@ scrape_configs:
       - targets: ["game-server:2567"]
   - job_name: "prometheus"
     static_configs:
-      - targets: ["150.241.69.143:9090"]
+      - targets: ["prometheus:9090"]

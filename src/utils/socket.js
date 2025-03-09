@@ -1,4 +1,4 @@
 import { Client } from "colyseus.js";
 
-const client = new Client("ws://150.241.69.143:2567");
+const client = new Client(import.meta.env.VITE_WS_URL);
 export default client;
