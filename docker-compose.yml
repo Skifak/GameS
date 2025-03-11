@@ -23,8 +23,8 @@ services:
       - ${SSL_CERT_PATH}:/etc/ssl/certs/gamest.pem
       - ${SSL_KEY_PATH}:/etc/ssl/private/gamest.key
     environment:
-      NODE_ENV: production
-      NATS_URL: nats://nats:4222
+      NODE_ENV: ${NODE_ENV}
+      NATS_URL: ${NATS_URL}
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
@@ -54,7 +54,7 @@ services:
     ports:
       - "9121:9121"
     environment:
-      REDIS_ADDR: redis:6379
+      REDIS_ADDR: ${REDIS_URL}
     depends_on:
       redis:
         condition: service_started
@@ -93,7 +93,7 @@ services:
       - ./promtail/config.yml:/etc/promtail/config.yml
     command:
       - -config.file=/etc/promtail/config.yml
-      - -client.url=http://loki:3100/loki/api/v1/push
+      - -client.url=${LOKI_URL}/loki/api/v1/push
     depends_on:
       - loki
 
@@ -145,13 +145,14 @@ services:
       retries: 5
 
   supabase-auth:
-    image: supabase/gotrue:v2.132.3
+    image: supabase/gotrue:v2.170.0
     depends_on:
       supabase-db:
         condition: service_healthy
     ports:
-      - "${AUTH_PORT}:9999"
+      - "${AUTH_PORT}:8081"
     environment:
+      GOTRUE_DB_SEARCH_PATH: ${GOTRUE_DB_NAMESPACE}
       GOTRUE_API_HOST: ${GOTRUE_API_HOST}
       GOTRUE_DB_DRIVER: ${GOTRUE_DB_DRIVER}
       GOTRUE_SITE_URL: ${GOTRUE_SITE_URL}
@@ -179,7 +180,7 @@ services:
     environment:
       STUDIO_PG_META_URL: http://supabase-meta:8080
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@supabase-db:5432/postgres
+      DATABASE_URL: ${DATABASE_URL}
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_REST_URL: ${SUPABASE_URL}
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
@@ -206,7 +207,7 @@ services:
       PG_META_DB_HOST: supabase-db
       PG_META_DB_PORT: 5432
       PG_META_DB_NAME: ${POSTGRES_DB}
-      PG_META_DB_USER: postgres
+      PG_META_DB_USER: ${POSTGRES_USER}
       PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
 
   supabase-realtime:
@@ -217,27 +218,32 @@ services:
     ports:
       - "4000:4000"
     environment:
-      SECRET_KEY_BASE: "your-super-secret-key-base-at-least-64-bytes-long-please-change-it"
+      SECRET_KEY_BASE: "your-super-secret-key-base-at-least-64-bytes-long-please-change-it"  # Замени на более длинный ключ
       PORT: 4000
-      DB_HOST: supabase-db
-      DB_PORT: 5432
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: ${DB_HOST:-supabase-db}  # Фallback на supabase-db
+      DB_PORT: ${DB_PORT:-5432}         # Фallback на 5432
+      DB_USER: ${POSTGRES_USER}         # Используем POSTGRES_USER
+      DB_PASSWORD: ${POSTGRES_PASSWORD} # Используем POSTGRES_PASSWORD
       DB_NAME: ${POSTGRES_DB}
       SECURE_CHANNELS: 'true'
       JWT_SECRET: ${SUPABASE_JWT_SECRET}
-      APP_NAME: "supabase-realtime"
+      APP_NAME: ${APP_NAME}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   storage:
     image: supabase/storage-api:latest
     ports:
-      - '${STORAGE_PORT}:5000'
+      - "${STORAGE_PORT}:5000"
     depends_on:
       supabase-db:
         condition: service_healthy
     environment:
       SERVER_PORT: ${STORAGE_PORT}
-      JWT_SECRET: ${JWT_SECRET}
+      PGRST_JWT_SECRET: ${PGRST_JWT_SECRET}  # Добавлено для Storage
       DATABASE_URL: ${DATABASE_URL}
       STORAGE_BACKEND: ${STORAGE_BACKEND}
       STORAGE_FILE_BACKEND_PATH: ${STORAGE_FILE_BACKEND_PATH}
@@ -246,6 +252,11 @@ services:
       UPLOAD_SIGNED_URL_EXPIRATION_TIME: ${UPLOAD_SIGNED_URL_EXPIRATION_TIME}
     volumes:
       - ./storage:/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   grafana-storage: {}
