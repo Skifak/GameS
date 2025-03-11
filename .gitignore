@@ -33,6 +33,7 @@ build
 *.njsproj
 *.sln
 *.sw?
+.error.txt
 
 # Testing
 coverage

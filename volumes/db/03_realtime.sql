@@ -1,5 +1,6 @@
 -- Create realtime schema
 CREATE SCHEMA IF NOT EXISTS realtime;
+GRANT USAGE ON SCHEMA realtime TO authenticator;
 
 -- Create subscription table
 CREATE TABLE IF NOT EXISTS realtime.subscription (
