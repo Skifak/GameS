@@ -41,6 +41,10 @@ jobs:
       - name: Build client
         run: npm run build -- --mode ${{ env.DEPLOY_ENV }}
 
+      - name: Check contents of volumes/db
+        run: |
+          ls -al volumes/db
+
       - name: Deploy to server
         env:
           DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
@@ -59,10 +63,13 @@ jobs:
           scp -o StrictHostKeyChecking=no -i deploy_key -r prometheus loki grafana promtail supabase root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
           scp -o StrictHostKeyChecking=no -i deploy_key volumes/db/*.sql volumes/db/pg_hba.conf root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/volumes/db/
           
+          # Проверяем содержимое после копирования
+          ssh -o StrictHostKeyChecking=no -i deploy_key root@${{ env.SERVER_HOST }} "ls -al ${{ env.SERVER_PATH }}/volumes/db/"
+
           # Запускаем контейнеры
           ssh -o StrictHostKeyChecking=no -i deploy_key root@${{ env.SERVER_HOST }} << 'EOF'
             cd ${{ env.SERVER_PATH }}
-            docker compose down --volumes
+            docker compose down  # Убрали --volumes
             docker compose up --detach --build --remove-orphans
           EOF
           

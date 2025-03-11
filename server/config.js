@@ -88,7 +88,7 @@ const envConfig = {
     debug: false,
     logLevel: 'info',
     cors: {
-      origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['https://yourdomain.com'],
+      origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['https://150.241.69.143'],
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization']

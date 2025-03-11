@@ -128,14 +128,15 @@ services:
       - "${POSTGRES_PORT}:5432"
     command: postgres -c config_file=/etc/postgresql/postgresql.conf
     environment:
+      POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: postgres
     volumes:
-      - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/realtime.sql
-      - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/roles.sql
-      - ./volumes/db/init_admin.sql:/docker-entrypoint-initdb.d/init_admin.sql
-      - ./volumes/db/init_auth.sql:/docker-entrypoint-initdb.d/init_auth.sql
+      - ./volumes/db/01_init_auth.sql:/docker-entrypoint-initdb.d/01_init_auth.sql
+      - ./volumes/db/02_roles.sql:/docker-entrypoint-initdb.d/02_roles.sql
+      - ./volumes/db/03_realtime.sql:/docker-entrypoint-initdb.d/03_realtime.sql
+      - ./volumes/db/04_init_admin.sql:/docker-entrypoint-initdb.d/04_init_admin.sql
+      - ./volumes/db/pg_hba.conf:/etc/postgresql/pg_hba.conf
       - supabase-db-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
