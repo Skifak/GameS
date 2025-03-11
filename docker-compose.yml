@@ -150,39 +150,22 @@ services:
       supabase-db:
         condition: service_healthy
     ports:
-      - "9999:9999"
+      - "${AUTH_PORT}:9999"
     environment:
-      DATABASE_URL: postgres://authenticator:authenticator@supabase-db:5432/${POSTGRES_DB}?sslmode=disable
-      GOTRUE_JWT_SECRET: ${SUPABASE_JWT_SECRET}
-      GOTRUE_DB_DRIVER: postgres
-      DB_NAMESPACE: auth
-      API_EXTERNAL_URL: ${SUPABASE_URL}
-      GOTRUE_API_HOST: 0.0.0.0
-      PORT: 9999
-      GOTRUE_DB_HOST: supabase-db
-      GOTRUE_DB_PORT: 5432
-      GOTRUE_DB_NAME: ${POSTGRES_DB}
-      GOTRUE_DB_USER: authenticator
-      GOTRUE_DB_PASSWORD: authenticator
-      ENABLE_EMAIL_SIGNUP: 'true'
-      ENABLE_EMAIL_AUTOCONFIRM: 'true'
-      GOTRUE_SITE_URL: http://localhost:${CLIENT_PORT}
-      GOTRUE_ADDITIONAL_REDIRECT_URLS: ${ADDITIONAL_REDIRECT_URLS:-http://localhost:${CLIENT_PORT}}
-      GOTRUE_CORS_ALLOWED_ORIGINS: "http://localhost:${CLIENT_PORT}"
-      GOTRUE_CORS_ALLOWED_METHODS: "GET,POST,PUT,DELETE,OPTIONS,PATCH"
-      GOTRUE_CORS_ALLOWED_HEADERS: "Accept,Authorization,Content-Type,X-Client-Info,apikey"
-      GOTRUE_CORS_EXPOSED_HEADERS: "Content-Range,Range"
-      GOTRUE_CORS_MAX_AGE: "3600"
-      GOTRUE_DISABLE_SIGNUP: "false"
-      GOTRUE_JWT_EXP: ${GOTRUE_JWT_EXP:-3600}
-      GOTRUE_JWT_DEFAULT_GROUP_NAME: ${GOTRUE_JWT_DEFAULT_GROUP_NAME:-authenticated}
-      GOTRUE_EXTERNAL_EMAIL_ENABLED: ${GOTRUE_EXTERNAL_EMAIL_ENABLED:-false}
-      GOTRUE_MAILER_AUTOCONFIRM: ${GOTRUE_MAILER_AUTOCONFIRM:-true}
-      GOTRUE_SMS_AUTOCONFIRM: ${GOTRUE_SMS_AUTOCONFIRM:-true}
-      LOG_LEVEL: debug
+      GOTRUE_API_HOST: ${GOTRUE_API_HOST}
+      GOTRUE_DB_DRIVER: ${GOTRUE_DB_DRIVER}
+      GOTRUE_SITE_URL: ${GOTRUE_SITE_URL}
+      GOTRUE_URI: ${GOTRUE_URI}
+      GOTRUE_JWT_SECRET: ${GOTRUE_JWT_SECRET}
+      GOTRUE_JWT_EXP: ${GOTRUE_JWT_EXP}
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: ${GOTRUE_JWT_DEFAULT_GROUP_NAME}
+      GOTRUE_DB_NAMESPACE: ${GOTRUE_DB_NAMESPACE}
+      GOTRUE_MAILER_AUTOCONFIRM: ${GOTRUE_MAILER_AUTOCONFIRM}
+      GOTRUE_SMS_AUTOCONFIRM: ${GOTRUE_SMS_AUTOCONFIRM}
+      DATABASE_URL: ${DATABASE_URL}
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
       start_period: 5s
