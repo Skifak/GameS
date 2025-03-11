@@ -1,5 +1,6 @@
 name: gamest
-
+env_file:
+  - .env.prod
 services:
   game-server:
     build:
@@ -211,28 +212,28 @@ services:
       PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
 
   supabase-realtime:
-    image: supabase/realtime:v2.25.22
-    depends_on:
-      supabase-db:
-        condition: service_healthy
-    ports:
-      - "4000:4000"
-    environment:
-      SECRET_KEY_BASE: "your-super-secret-key-base-at-least-64-bytes-long-please-change-it"  # Замени на более длинный ключ
-      PORT: 4000
-      DB_HOST: ${DB_HOST:-supabase-db}  # Фallback на supabase-db
-      DB_PORT: ${DB_PORT:-5432}         # Фallback на 5432
-      DB_USER: ${POSTGRES_USER}         # Используем POSTGRES_USER
-      DB_PASSWORD: ${POSTGRES_PASSWORD} # Используем POSTGRES_PASSWORD
-      DB_NAME: ${POSTGRES_DB}
-      SECURE_CHANNELS: 'true'
-      JWT_SECRET: ${SUPABASE_JWT_SECRET}
-      APP_NAME: ${APP_NAME}
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+  image: supabase/realtime:v2.25.22
+  depends_on:
+    supabase-db:
+      condition: service_healthy
+  ports:
+    - "4000:4000"
+  environment:
+    SECRET_KEY_BASE: "your-super-secret-key-base-at-least-64-bytes-long-please-change-it"
+    PORT: 4000
+    DB_HOST: ${DB_HOST:-supabase-db}
+    DB_PORT: ${DB_PORT:-5432}
+    DB_USER: ${POSTGRES_USER}
+    DB_PASSWORD: ${POSTGRES_PASSWORD}
+    DB_NAME: ${POSTGRES_DB}
+    SECURE_CHANNELS: 'true'
+    JWT_SECRET: ${SUPABASE_JWT_SECRET}
+    APP_NAME: ${APP_NAME}
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+    interval: 5s
+    timeout: 5s
+    retries: 5
 
   storage:
     image: supabase/storage-api:latest
