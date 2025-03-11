@@ -62,8 +62,8 @@ jobs:
           # Запускаем контейнеры
           ssh -o StrictHostKeyChecking=no -i deploy_key root@${{ env.SERVER_HOST }} << 'EOF'
             cd ${{ env.SERVER_PATH }}
-            docker-compose down -v
-            docker-compose up -d --build
+            docker compose down --volumes
+            docker compose up --detach --build --remove-orphans
           EOF
           
           rm deploy_key

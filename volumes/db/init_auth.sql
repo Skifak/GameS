@@ -1,30 +1,117 @@
+-- Create extensions
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS pgjwt;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Create auth schema
+CREATE SCHEMA IF NOT EXISTS auth;
+
+-- Create users table
 CREATE TABLE IF NOT EXISTS auth.users (
-    instance_id uuid NULL,
-    id uuid NOT NULL UNIQUE,
-    aud varchar(255) NULL,
-    role varchar(255) NULL,
-    email varchar(255) NULL UNIQUE,
-    encrypted_password varchar(255) NULL,
-    confirmed_at timestamptz NULL,
-    invited_at timestamptz NULL,
-    confirmation_token varchar(255) NULL,
-    confirmation_sent_at timestamptz NULL,
-    recovery_token varchar(255) NULL,
-    recovery_sent_at timestamptz NULL,
-    email_change_token varchar(255) NULL,
-    email_change varchar(255) NULL,
-    email_change_sent_at timestamptz NULL,
-    last_sign_in_at timestamptz NULL,
-    raw_app_meta_data jsonb NULL,
-    raw_user_meta_data jsonb NULL,
-    is_super_admin bool NULL,
-    created_at timestamptz NULL,
-    updated_at timestamptz NULL,
-    CONSTRAINT users_pkey PRIMARY KEY (id)
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    email varchar(255) UNIQUE NOT NULL,
+    encrypted_password varchar(255) NOT NULL,
+    email_confirmed_at timestamptz DEFAULT now(),
+    is_super_admin boolean DEFAULT false,
+    raw_app_meta_data jsonb DEFAULT '{}'::jsonb,
+    raw_user_meta_data jsonb DEFAULT '{}'::jsonb,
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS users_instance_id_email_idx ON auth.users USING btree (instance_id, email);
-CREATE INDEX IF NOT EXISTS users_instance_id_idx ON auth.users USING btree (instance_id);
+-- Create profiles table
+CREATE TABLE IF NOT EXISTS public.profiles (
+    id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    username varchar(255) UNIQUE NOT NULL,
+    avatar_url varchar(255),
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+);
+
+-- Enable RLS
+ALTER TABLE auth.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+-- Create auth functions
+CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid AS $$
+  SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
+$$ LANGUAGE sql STABLE;
+
+CREATE OR REPLACE FUNCTION auth.role() RETURNS text AS $$
+  SELECT nullif(current_setting('request.jwt.claim.role', true), '')::text;
+$$ LANGUAGE sql STABLE;
+
+-- Create auth policies
+CREATE POLICY "Users can read their own data" ON auth.users
+    FOR SELECT USING (auth.uid() = id);
+
+CREATE POLICY "Users can update their own data" ON auth.users
+    FOR UPDATE USING (auth.uid() = id);
+
+-- Create profile policies
+CREATE POLICY "Profiles are viewable by everyone" ON public.profiles
+    FOR SELECT USING (true);
+
+CREATE POLICY "Users can update own profile" ON public.profiles
+    FOR UPDATE USING (auth.uid() = id);
+
+CREATE POLICY "Users can insert own profile" ON public.profiles
+    FOR INSERT WITH CHECK (auth.uid() = id);
+
+-- Create trigger for profile creation
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.profiles (id, username)
+    VALUES (NEW.id, NEW.email);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW
+    EXECUTE FUNCTION public.handle_new_user();
+
+-- Create auth functions
+CREATE OR REPLACE FUNCTION auth.register(
+    email text,
+    password text,
+    username text DEFAULT NULL
+) RETURNS auth.users AS $$
+DECLARE
+    new_user auth.users;
+BEGIN
+    INSERT INTO auth.users (email, encrypted_password)
+    VALUES (
+        email,
+        crypt(password, gen_salt('bf'))
+    )
+    RETURNING * INTO new_user;
+
+    RETURN new_user;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION auth.login(
+    email text,
+    password text
+) RETURNS auth.users AS $$
+DECLARE
+    user_data auth.users;
+BEGIN
+    SELECT * INTO user_data
+    FROM auth.users
+    WHERE users.email = login.email
+    AND users.encrypted_password = crypt(password, users.encrypted_password);
+
+    IF user_data.id IS NULL THEN
+        RAISE EXCEPTION 'Invalid email or password';
+    END IF;
+
+    RETURN user_data;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE TABLE IF NOT EXISTS auth.refresh_tokens (
     instance_id uuid NULL,
@@ -64,17 +151,6 @@ CREATE TABLE IF NOT EXISTS auth.schema_migrations (
     version varchar(255) NOT NULL,
     CONSTRAINT schema_migrations_pkey PRIMARY KEY (version)
 );
-
-CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid AS $$
-  SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
-$$ LANGUAGE sql STABLE;
-
-CREATE OR REPLACE FUNCTION auth.role() RETURNS text AS $$
-  SELECT nullif(current_setting('request.jwt.claim.role', true), '')::text;
-$$ LANGUAGE sql STABLE;
-
--- Create auth schema if not exists
-CREATE SCHEMA IF NOT EXISTS auth;
 
 -- Create authenticator role if not exists
 DO
@@ -146,23 +222,6 @@ GRANT ALL ON SEQUENCES TO authenticator;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
 GRANT ALL ON FUNCTIONS TO authenticator;
-
--- Создаем базовую таблицу пользователей
-CREATE TABLE IF NOT EXISTS auth.users (
-    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-    email varchar(255) UNIQUE NOT NULL,
-    encrypted_password varchar(255) NOT NULL,
-    created_at timestamptz DEFAULT now(),
-    updated_at timestamptz DEFAULT now()
-);
-
--- Создаем таблицу профилей
-CREATE TABLE IF NOT EXISTS public.profiles (
-    id uuid PRIMARY KEY REFERENCES auth.users(id),
-    username varchar(255) NOT NULL,
-    avatar_url varchar(255),
-    updated_at timestamptz DEFAULT now()
-);
 
 -- Даем права на чтение схемы auth для anon
 GRANT USAGE ON SCHEMA auth TO anon;

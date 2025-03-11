@@ -11,7 +11,17 @@ INSERT INTO auth.users (
   crypt('75115754Ss++', gen_salt('bf')), -- замените на ваш пароль
   now(),
   true,
-  'service_role',
-  '{"provider":"email","providers":["email"]}',
-  '{"name":"Admin"}'
-); 
+  '{"role": "service_role"}',
+  '{"name": "Admin"}'
+);
+
+-- Создание профиля для администратора
+INSERT INTO public.profiles (
+    id,
+    username
+) 
+SELECT 
+    id,
+    'admin'
+FROM auth.users 
+WHERE email = 'skif7511@gmail.com'; 

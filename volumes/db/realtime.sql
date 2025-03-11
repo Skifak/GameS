@@ -1,21 +1,31 @@
+-- Create realtime schema
 CREATE SCHEMA IF NOT EXISTS realtime;
 
--- Создаем таблицу для подписок
+-- Create subscription table
 CREATE TABLE IF NOT EXISTS realtime.subscription (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     subscription_id uuid NOT NULL,
     entity text NOT NULL,
-    filters jsonb,
-    claims jsonb,
-    created_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+    filters jsonb DEFAULT '{}'::jsonb,
+    claims jsonb DEFAULT '{}'::jsonb,
+    created_at timestamptz DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Создаем индекс для быстрого поиска по subscription_id
-CREATE INDEX IF NOT EXISTS subscription_subscription_id_idx ON realtime.subscription (subscription_id);
+-- Create indexes
+CREATE INDEX IF NOT EXISTS subscription_subscription_id_idx 
+    ON realtime.subscription (subscription_id);
+CREATE INDEX IF NOT EXISTS subscription_entity_idx 
+    ON realtime.subscription (entity);
 
--- Даем права на схему realtime
-GRANT USAGE ON SCHEMA realtime TO postgres, anon, authenticated, service_role;
+-- Grant permissions
+GRANT USAGE ON SCHEMA realtime TO postgres, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA realtime TO postgres, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA realtime TO postgres, authenticated, service_role;
 
--- Даем права на таблицы в схеме realtime
-GRANT ALL ON ALL TABLES IN SCHEMA realtime TO postgres, anon, authenticated, service_role;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA realtime TO postgres, anon, authenticated, service_role; 
+-- Set default privileges
+ALTER DEFAULT PRIVILEGES IN SCHEMA realtime
+    GRANT ALL ON TABLES TO postgres, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA realtime
+    GRANT ALL ON SEQUENCES TO postgres, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA realtime
+    GRANT ALL ON FUNCTIONS TO postgres, authenticated, service_role; 
