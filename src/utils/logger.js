@@ -1,23 +1,46 @@
-import { createLogger, format as _format, transports as _transports } from "winston";
+import winston from "winston";
 import LokiTransport from "winston-loki";
+import config from "../../server/config.js";
 
-const logger = createLogger({
-    level: "info",
-    format: _format.combine(
-        _format.timestamp(),
-        _format.json()
+const logger = winston.createLogger({
+    level: config?.debug ? "debug" : "info",
+    format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.json()
     ),
     transports: [
-        new _transports.Console(),
-        new _transports.File({ filename: "logs/error.log", level: "error" }),
-        new _transports.File({ filename: "logs/combined.log" }),
-        new LokiTransport({
-            host: "http://loki:3100",
-            labels: { app: "client" },
-            json: true,
-            onConnectionError: (err) => console.error("Loki connection error:", err)
-        })
+        new winston.transports.Console(),
+        new winston.transports.File({ filename: "logs/error.log", level: "error" }),
+        new winston.transports.File({ filename: "logs/combined.log" })
     ]
 });
+
+const logLevel = config.env === 'development' ? 'debug' : 'info';
+const logFormat = config.env === 'development' 
+  ? winston.format.combine(
+      winston.format.colorize(),
+      winston.format.simple()
+    )
+  : winston.format.json();
+
+// Добавляем Loki транспорт только если он доступен
+if (config?.lokiUrl) {
+    try {
+        logger.add(new LokiTransport({
+            host: config.lokiUrl,
+            labels: { app: "game-server" },
+            json: true,
+            onConnectionError: (err) => {
+                if (config.env === 'development') {
+                    console.warn("Loki connection error in development mode:", err.message);
+                } else {
+                    console.error("Loki connection error:", err);
+                }
+            }
+        }));
+    } catch (error) {
+        console.warn(`Failed to add Loki transport: ${error.message}`);
+    }
+}
 
 export default logger;

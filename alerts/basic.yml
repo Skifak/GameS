@@ -1,0 +1,72 @@
+groups:
+  - name: basic_alerts
+    rules:
+      # Алерт на высокую загрузку CPU
+      - alert: HighCPULoad
+        expr: rate(process_cpu_seconds_total[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High CPU load (instance {{ $labels.instance }})
+          description: CPU load is > 80%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}
+
+      # Алерт на высокое использование памяти
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High memory usage (instance {{ $labels.instance }})
+          description: Memory usage is > 85%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}
+
+      # Алерт на ошибки в игровом сервере
+      - alert: HighErrorRate
+        expr: rate(game_server_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: High error rate in game server (instance {{ $labels.instance }})
+          description: Error rate is > 0.1 errors per second\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}
+
+      # Алерт на проблемы с Redis
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Redis is down (instance {{ $labels.instance }})
+          description: Redis instance is down\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}
+
+      # Алерт на проблемы с базой данных
+      - alert: DatabaseDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Database is down (instance {{ $labels.instance }})
+          description: PostgreSQL instance is down\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}
+
+      # Алерт на высокую латентность API
+      - alert: HighAPILatency
+        expr: http_request_duration_seconds{quantile="0.9"} > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High API latency (instance {{ $labels.instance }})
+          description: 90th percentile of HTTP request duration is > 1s\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}
+
+      # Алерт на проблемы с NATS
+      - alert: NATSDown
+        expr: nats_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: NATS is down (instance {{ $labels.instance }})
+          description: NATS instance is down\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }} 

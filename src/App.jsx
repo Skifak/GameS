@@ -1,94 +1,106 @@
-import { useRef, useState } from 'react';
-
+import { useRef } from 'react';
 import Phaser from 'phaser';
 import { PhaserGame } from './game/PhaserGame';
+import AuthForm from './components/AuthForm';
+import { useAuth } from './hooks/useAuth';
 
-function App ()
-{
-    // The sprite can only be moved in the MainMenu Scene
-    const [canMoveSprite, setCanMoveSprite] = useState(true);
-    
-    //  References to the PhaserGame component (game and scene are exposed)
+function App() {
+    const { isAuthenticated, loading, user, logout } = useAuth();
     const phaserRef = useRef();
-    const [spritePosition, setSpritePosition] = useState({ x: 0, y: 0 });
 
-    const changeScene = () => {
-
-        const scene = phaserRef.current.scene;
-
-        if (scene)
-        {
-            scene.changeScene();
-        }
+    if (loading) {
+        return (
+            <div className="loading-container">
+                <div className="loading-spinner"></div>
+                <p>Загрузка...</p>
+                <style>{`
+                    .loading-container {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        height: 100vh;
+                        background-color: #f5f6fa;
+                    }
+                    
+                    .loading-spinner {
+                        width: 50px;
+                        height: 50px;
+                        border: 5px solid #f3f3f3;
+                        border-top: 5px solid #3498db;
+                        border-radius: 50%;
+                        animation: spin 1s linear infinite;
+                        margin-bottom: 20px;
+                    }
+                    
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                    
+                    p {
+                        color: #2c3e50;
+                        font-size: 18px;
+                    }
+                `}</style>
+            </div>
+        );
     }
 
-    const moveSprite = () => {
-
-        const scene = phaserRef.current.scene;
-
-        if (scene && scene.scene.key === 'MainMenu')
-        {
-            // Get the update logo position
-            scene.moveLogo(({ x, y }) => {
-
-                setSpritePosition({ x, y });
-
-            });
-        }
-    }
-
-    const addSprite = () => {
-
-        const scene = phaserRef.current.scene;
-
-        if (scene)
-        {
-            // Add more stars
-            const x = Phaser.Math.Between(64, scene.scale.width - 64);
-            const y = Phaser.Math.Between(64, scene.scale.height - 64);
-
-            //  `add.sprite` is a Phaser GameObjectFactory method and it returns a Sprite Game Object instance
-            const star = scene.add.sprite(x, y, 'star');
-
-            //  ... which you can then act upon. Here we create a Phaser Tween to fade the star sprite in and out.
-            //  You could, of course, do this from within the Phaser Scene code, but this is just an example
-            //  showing that Phaser objects and systems can be acted upon from outside of Phaser itself.
-            scene.add.tween({
-                targets: star,
-                duration: 500 + Math.random() * 1000,
-                alpha: 0,
-                yoyo: true,
-                repeat: -1
-            });
-        }
-    }
-
-    // Event emitted from the PhaserGame component
-    const currentScene = (scene) => {
-
-        setCanMoveSprite(scene.scene.key !== 'MainMenu');
-        
+    if (!isAuthenticated) {
+        return <AuthForm />;
     }
 
     return (
         <div id="app">
-            <PhaserGame ref={phaserRef} currentActiveScene={currentScene} />
-            <div>
-                <div>
-                    <button className="button" onClick={changeScene}>Change Scene</button>
+            <div className="header">
+                <div className="user-info">
+                    <span>Привет, {user?.name || 'Игрок'}!</span>
                 </div>
-                <div>
-                    <button disabled={canMoveSprite} className="button" onClick={moveSprite}>Toggle Movement</button>
-                </div>
-                <div className="spritePosition">Sprite Position:
-                    <pre>{`{\n  x: ${spritePosition.x}\n  y: ${spritePosition.y}\n}`}</pre>
-                </div>
-                <div>
-                    <button className="button" onClick={addSprite}>Add New Sprite</button>
-                </div>
+                <button onClick={logout} className="logout-button">
+                    Выйти
+                </button>
             </div>
+            
+            <PhaserGame ref={phaserRef} />
+            
+            <style>{`
+                #app {
+                    display: flex;
+                    flex-direction: column;
+                    height: 100vh;
+                }
+                
+                .header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 15px 20px;
+                    background-color: #2c3e50;
+                    color: white;
+                }
+                
+                .user-info {
+                    font-size: 16px;
+                }
+                
+                .logout-button {
+                    padding: 8px 16px;
+                    background-color: #e74c3c;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    transition: background-color 0.3s ease;
+                }
+                
+                .logout-button:hover {
+                    background-color: #c0392b;
+                }
+            `}</style>
         </div>
-    )
+    );
 }
 
-export default App
+export default App;

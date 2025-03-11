@@ -1,86 +1,272 @@
-version: "3"  # Рекомендую явно указать версию
+name: gamest
+
 services:
   game-server:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - NODE_ENV=production
     ports:
       - "2567:2567"
     depends_on:
-      - redis
-      - nats
+      redis:
+        condition: service_started
+      nats:
+        condition: service_started
+      supabase-db:
+        condition: service_healthy
+      supabase-auth:
+        condition: service_started
     volumes:
       - ./logs:/app/logs
+      - ${SSL_CERT_PATH}:/etc/ssl/certs/gamest.pem
+      - ${SSL_KEY_PATH}:/etc/ssl/private/gamest.key
     environment:
-      - NODE_ENV=development
-      - NATS_URL=nats://nats:4222
+      NODE_ENV: production
+      NATS_URL: nats://nats:4222
+      SUPABASE_URL: https://150.241.69.143/auth
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      SSL_CERT_PATH: /etc/ssl/certs/gamest.pem
+      SSL_KEY_PATH: /etc/ssl/private/gamest.key
+
   redis:
     image: "redis:latest"
     ports:
       - "6379:6379"
+
   prometheus:
     image: prom/prometheus:latest
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+
   redis-exporter:
     image: oliver006/redis_exporter:latest
     ports:
       - "9121:9121"
     environment:
-      - REDIS_ADDR=redis:6379
+      REDIS_ADDR: redis:6379
     depends_on:
-      - redis
+      redis:
+        condition: service_started
+
   grafana:
     image: grafana/grafana:latest
     ports:
       - "3000:3000"
     volumes:
       - grafana-storage:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/etc/grafana/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_started
+      loki:
+        condition: service_started
+
   loki:
     image: grafana/loki:latest
     ports:
-      - "3100:3100"
-    command: -config.file=/etc/loki/loki-config.yml
+      - "3101:3100"
     volumes:
-      - ./loki-config.yml:/etc/loki/loki-config.yml
+      - ./loki/config.yml:/etc/loki/config.yml
       - loki-data:/loki
+    command: -config.file=/etc/loki/config.yml
 
-  # Nginx
+  promtail:
+    image: grafana/promtail:latest
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./promtail/config.yml:/etc/promtail/config.yml
+    command:
+      - -config.file=/etc/promtail/config.yml
+      - -client.url=http://loki:3100/loki/api/v1/push
+    depends_on:
+      - loki
+
   nginx:
     image: nginx:latest
     ports:
-      - "80:80"    # HTTP
+      - "80:80"
+      - "443:443"
     volumes:
-    - ./nginx.conf:/etc/nginx/conf.d/default.conf  # Монтируем nginx.conf как default.conf
-    - ./dist:/usr/share/nginx/html # Заменяет содержимое этой директории в контейнере на содержимое ./dist с хоста.
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./dist:/usr/share/nginx/html
+      - ${SSL_CERT_PATH}:/etc/ssl/certs/gamest.pem
+      - ${SSL_KEY_PATH}:/etc/ssl/private/gamest.key
     depends_on:
-      - game-server
-      - pocketbase
+      supabase-auth:
+        condition: service_healthy
+      supabase-db:
+        condition: service_healthy
+      supabase-realtime:
+        condition: service_started
+      game-server:
+        condition: service_started
+    restart: unless-stopped
 
-  # NATS
   nats:
     image: nats:latest
     ports:
-      - "4222:4222"  # Клиентский порт
-      - "8222:8222"  # Мониторинг (опционально)
-    command: "--jetstream"  # Включаем JetStream для продвинутых функций
+      - "4222:4222"
+      - "8222:8222"
+    command: "--jetstream"
 
-  # PocketBase
-  pocketbase:
-    image: ghcr.io/muchobien/pocketbase:latest  # Официальный образ
+  supabase-db:
+    image: supabase/postgres:15.1.0.117
     ports:
-      - "8090:8090"  # PocketBase по умолчанию на 8090
+      - "${POSTGRES_PORT}:5432"
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: postgres
     volumes:
-      - pocketbase-data:/pb_data  # Данные SQLite
-      - pocketbase-migrations:/pb_migrations  # Миграции (опционально)
-    command: --http="0.0.0.0:8090"  
+      - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/realtime.sql
+      - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/roles.sql
+      - ./volumes/db/init_admin.sql:/docker-entrypoint-initdb.d/init_admin.sql
+      - ./volumes/db/init_auth.sql:/docker-entrypoint-initdb.d/init_auth.sql
+      - supabase-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  supabase-auth:
+    image: supabase/gotrue:v2.132.3
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    ports:
+      - "9999:9999"
+    environment:
+      DATABASE_URL: postgres://authenticator:authenticator@supabase-db:5432/${POSTGRES_DB}?sslmode=disable
+      GOTRUE_JWT_SECRET: ${SUPABASE_JWT_SECRET}
+      GOTRUE_DB_DRIVER: postgres
+      DB_NAMESPACE: auth
+      API_EXTERNAL_URL: ${SUPABASE_URL}
+      GOTRUE_API_HOST: 0.0.0.0
+      PORT: 9999
+      GOTRUE_DB_HOST: supabase-db
+      GOTRUE_DB_PORT: 5432
+      GOTRUE_DB_NAME: ${POSTGRES_DB}
+      GOTRUE_DB_USER: authenticator
+      GOTRUE_DB_PASSWORD: authenticator
+      ENABLE_EMAIL_SIGNUP: 'true'
+      ENABLE_EMAIL_AUTOCONFIRM: 'true'
+      GOTRUE_SITE_URL: http://localhost:${CLIENT_PORT}
+      GOTRUE_ADDITIONAL_REDIRECT_URLS: ${ADDITIONAL_REDIRECT_URLS:-http://localhost:${CLIENT_PORT}}
+      GOTRUE_CORS_ALLOWED_ORIGINS: "http://localhost:${CLIENT_PORT}"
+      GOTRUE_CORS_ALLOWED_METHODS: "GET,POST,PUT,DELETE,OPTIONS,PATCH"
+      GOTRUE_CORS_ALLOWED_HEADERS: "Accept,Authorization,Content-Type,X-Client-Info,apikey"
+      GOTRUE_CORS_EXPOSED_HEADERS: "Content-Range,Range"
+      GOTRUE_CORS_MAX_AGE: "3600"
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_JWT_EXP: ${GOTRUE_JWT_EXP:-3600}
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: ${GOTRUE_JWT_DEFAULT_GROUP_NAME:-authenticated}
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: ${GOTRUE_EXTERNAL_EMAIL_ENABLED:-false}
+      GOTRUE_MAILER_AUTOCONFIRM: ${GOTRUE_MAILER_AUTOCONFIRM:-true}
+      GOTRUE_SMS_AUTOCONFIRM: ${GOTRUE_SMS_AUTOCONFIRM:-true}
+      LOG_LEVEL: debug
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  supabase-studio:
+    image: supabase/studio:latest
+    ports:
+      - "${STUDIO_PORT}:3000"
+    environment:
+      STUDIO_PG_META_URL: http://supabase-meta:8080
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@supabase-db:5432/postgres
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_REST_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      DEFAULT_ORGANIZATION: ${STUDIO_DEFAULT_ORGANIZATION}
+      DEFAULT_PROJECT: ${STUDIO_DEFAULT_PROJECT}
+      DASHBOARD_USERNAME: ${DASHBOARD_USERNAME}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD}
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+      supabase-meta:
+        condition: service_started
+
+  supabase-meta:
+    image: supabase/postgres-meta:v0.75.0
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: supabase-db
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: ${POSTGRES_DB}
+      PG_META_DB_USER: postgres
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+
+  supabase-realtime:
+    image: supabase/realtime:v2.25.22
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    ports:
+      - "4000:4000"
+    environment:
+      SECRET_KEY_BASE: "your-super-secret-key-base-at-least-64-bytes-long-please-change-it"
+      PORT: 4000
+      DB_HOST: supabase-db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
+      SECURE_CHANNELS: 'true'
+      JWT_SECRET: ${SUPABASE_JWT_SECRET}
+      APP_NAME: "supabase-realtime"
+
+  storage:
+    image: supabase/storage-api:latest
+    ports:
+      - '${STORAGE_PORT}:5000'
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: ${STORAGE_PORT}
+      JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: ${DATABASE_URL}
+      STORAGE_BACKEND: ${STORAGE_BACKEND}
+      STORAGE_FILE_BACKEND_PATH: ${STORAGE_FILE_BACKEND_PATH}
+      UPLOAD_FILE_SIZE_LIMIT: ${UPLOAD_FILE_SIZE_LIMIT}
+      UPLOAD_FILE_SIZE_LIMIT_STANDARD: ${UPLOAD_FILE_SIZE_LIMIT_STANDARD}
+      UPLOAD_SIGNED_URL_EXPIRATION_TIME: ${UPLOAD_SIGNED_URL_EXPIRATION_TIME}
+    volumes:
+      - ./storage:/storage
 
 volumes:
   grafana-storage: {}
+  prometheus-data: {}
   loki-data: {}
-  pocketbase-data: {}
-  pocketbase-migrations: {}
+  supabase-db-data: {}

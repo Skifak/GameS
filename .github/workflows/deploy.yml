@@ -2,36 +2,91 @@ name: Deploy GameST
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - develop
 
 jobs:
-  deploy:
+  test:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: 20
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: npm install
+      - name: Install dependencies
+        run: npm install
 
-    - name: Build client
-      run: npm run build
+      - name: Run tests
+        run: npm test
 
-    - name: Deploy to server
-      env:
-        DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
-      run: |
-        echo "$DEPLOY_KEY" > deploy_key
-        chmod 600 deploy_key
-        scp -o StrictHostKeyChecking=no -i deploy_key -r dist server root@150.241.69.143:/opt/serv-game/
-        scp -o StrictHostKeyChecking=no -i deploy_key package.json docker-compose.yml Dockerfile prometheus.yml loki-config.yml nginx.conf root@150.241.69.143:/opt/serv-game/
-        ssh -o StrictHostKeyChecking=no -i deploy_key root@150.241.69.143 << 'EOF'
-          cd /opt/serv-game
-          docker-compose up -d --build
-        EOF
-        rm deploy_key
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_ENV: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
+      SERVER_HOST: ${{ github.ref == 'refs/heads/main' && '150.241.69.143' || 'localhost' }}
+      SERVER_PATH: ${{ github.ref == 'refs/heads/main' && '/opt/serv-game' || '/opt/serv-game-dev' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Prepare environment file
+        run: |
+          if [ "${{ env.DEPLOY_ENV }}" = "production" ]; then
+            echo "Using production environment"
+            cp .env.prod .env
+          else
+            echo "Using development environment"
+            cp .env .env.tmp
+            mv .env.tmp .env
+          fi
+
+      - name: Build client
+        run: npm run build -- --mode ${{ env.DEPLOY_ENV }}
+
+      - name: Deploy to server
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
+          echo "$DEPLOY_KEY" > deploy_key
+          chmod 600 deploy_key
+          
+          # Создаем директорию если она не существует
+          ssh -o StrictHostKeyChecking=no -i deploy_key root@${{ env.SERVER_HOST }} "mkdir -p ${{ env.SERVER_PATH }}"
+          
+          # Копируем файлы
+          scp -o StrictHostKeyChecking=no -i deploy_key -r dist server root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
+          scp -o StrictHostKeyChecking=no -i deploy_key package.json docker-compose.yml Dockerfile .env root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
+          
+          # Копируем конфигурации
+          scp -o StrictHostKeyChecking=no -i deploy_key -r prometheus loki grafana promtail root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
+          
+          # Запускаем контейнеры
+          ssh -o StrictHostKeyChecking=no -i deploy_key root@${{ env.SERVER_HOST }} << 'EOF'
+            cd ${{ env.SERVER_PATH }}
+            docker-compose down -v
+            docker-compose up -d --build
+          EOF
+          
+          rm deploy_key
+
+      - name: Notify deployment
+        if: success()
+        run: |
+          echo "Deployed to ${{ env.DEPLOY_ENV }} environment at ${{ env.SERVER_HOST }} successfully!"

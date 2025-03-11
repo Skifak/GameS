@@ -1,0 +1,62 @@
+groups:
+  - name: game_metrics
+    rules:
+      # Алерт на большое количество активных игровых сессий
+      - alert: HighGameSessionCount
+        expr: game_active_sessions > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High number of active game sessions
+          description: Number of active game sessions is > 1000\n VALUE = {{ $value }}
+
+      # Алерт на высокую задержку в игровых комнатах
+      - alert: GameRoomHighLatency
+        expr: game_room_latency_seconds{quantile="0.95"} > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High game room latency (instance {{ $labels.instance }})
+          description: 95th percentile of game room latency is > 100ms\n VALUE = {{ $value }}
+
+      # Алерт на ошибки синхронизации
+      - alert: GameSyncErrors
+        expr: rate(game_sync_errors_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: High sync error rate (instance {{ $labels.instance }})
+          description: Game synchronization error rate is > 0.05 per second\n VALUE = {{ $value }}
+
+      # Алерт на большое количество отключений игроков
+      - alert: HighPlayerDisconnectRate
+        expr: rate(game_player_disconnects_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High player disconnect rate (instance {{ $labels.instance }})
+          description: Player disconnect rate is > 1 per second\n VALUE = {{ $value }}
+
+      # Алерт на проблемы с Colyseus
+      - alert: ColyseusErrors
+        expr: rate(colyseus_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: High Colyseus error rate (instance {{ $labels.instance }})
+          description: Colyseus error rate is > 0.1 per second\n VALUE = {{ $value }}
+
+      # Алерт на использование памяти игровыми комнатами
+      - alert: GameRoomHighMemory
+        expr: game_room_memory_bytes > 1073741824  # 1GB
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High game room memory usage (instance {{ $labels.instance }})
+          description: Game room memory usage is > 1GB\n VALUE = {{ $value | humanize }} 

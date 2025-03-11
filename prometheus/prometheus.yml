@@ -1,0 +1,49 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Правила алертинга
+rule_files:
+  - "alerts/*.yml"
+
+scrape_configs:
+  # Мониторинг Redis
+  - job_name: "redis"
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+    metrics_path: /metrics
+
+  # Мониторинг игрового сервера
+  - job_name: "game-server"
+    static_configs:
+      - targets: ["game-server:2567"]
+    metrics_path: /metrics
+
+  # Мониторинг Supabase
+  - job_name: "supabase"
+    static_configs:
+      - targets: ["supabase-db:5432"]
+    metrics_path: /metrics
+
+  # Мониторинг NATS
+  - job_name: "nats"
+    static_configs:
+      - targets: ["nats:8222"]
+    metrics_path: /metrics
+
+  # Мониторинг Prometheus
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["prometheus:9090"]
+
+  # Мониторинг Node.js метрик
+  - job_name: "nodejs"
+    static_configs:
+      - targets: ["game-server:9091"]
+    metrics_path: /metrics
+
+  # Мониторинг Nginx
+  - job_name: "nginx"
+    static_configs:
+      - targets: ["nginx-exporter:9113"]
+    metrics_path: /metrics
