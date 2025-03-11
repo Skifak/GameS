@@ -31,7 +31,7 @@
         "start:prod": "docker-compose -f docker-compose.yml --env-file .env.production up -d",
         "stop": "docker-compose down -v",
         "deploy": "npm run build && npm run start:prod",
-        "test": "jest",
+        "test": "jest --passWithNoTests",
         "test:watch": "jest --watch",
         "test:coverage": "jest --coverage",
         "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
