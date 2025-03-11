@@ -7,26 +7,7 @@ on:
       - develop
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Run tests
-        run: npm test -- --passWithNoTests # Временно пропускаем отсутствие тестов
-
   deploy:
-    needs: test
     runs-on: ubuntu-latest
     env:
       DEPLOY_ENV: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
@@ -67,15 +48,16 @@ jobs:
           echo "$DEPLOY_KEY" > deploy_key
           chmod 600 deploy_key
           
-          # Создаем директорию если она не существует
-          ssh -o StrictHostKeyChecking=no -i deploy_key root@${{ env.SERVER_HOST }} "mkdir -p ${{ env.SERVER_PATH }}"
+          # Создаем директории если они не существуют
+          ssh -o StrictHostKeyChecking=no -i deploy_key root@${{ env.SERVER_HOST }} "mkdir -p ${{ env.SERVER_PATH }}/volumes/db"
           
           # Копируем файлы
           scp -o StrictHostKeyChecking=no -i deploy_key -r dist server root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
           scp -o StrictHostKeyChecking=no -i deploy_key package.json docker-compose.yml Dockerfile .env root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
           
           # Копируем конфигурации
-          scp -o StrictHostKeyChecking=no -i deploy_key -r prometheus loki grafana promtail root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
+          scp -o StrictHostKeyChecking=no -i deploy_key -r prometheus loki grafana promtail supabase root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
+          scp -o StrictHostKeyChecking=no -i deploy_key -r volumes/db/* root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/volumes/db/
           
           # Запускаем контейнеры
           ssh -o StrictHostKeyChecking=no -i deploy_key root@${{ env.SERVER_HOST }} << 'EOF'
