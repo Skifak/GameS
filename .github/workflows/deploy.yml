@@ -58,7 +58,7 @@ jobs:
           # Копируем Supabase файлы
           scp -o StrictHostKeyChecking=no -i deploy_key -r docker/volumes root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/supabase/
 
-          # Запускаем контейнерыz
+          # Запускаем контейнеры
           ssh -o StrictHostKeyChecking=no -i deploy_key root@${{ env.SERVER_HOST }} << 'EOF'
             cd ${{ env.SERVER_PATH }}
             docker compose down
