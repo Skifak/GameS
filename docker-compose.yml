@@ -136,7 +136,7 @@ services:
   nats-exporter:
     image: natsio/prometheus-nats-exporter:latest
     ports:
-      - "7777:7777"  # Порт для экспорта метрик (можно выбрать любой)
+      - "7777:7777"  # Порт для экспорта метрик (можно выбрать любой)/
     command:
     - "--varz"
     - "--connz"
