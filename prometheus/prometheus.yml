@@ -22,7 +22,7 @@ scrape_configs:
   # Мониторинг NATS
   - job_name: "nats"
     static_configs:
-      - targets: ["nats:8222"]
+      - targets: ['nats-exporter:7777']
     metrics_path: /metrics
 
   # Мониторинг Prometheus

@@ -46,6 +46,7 @@ services:
       - '--web.console.templates=/usr/share/prometheus/consoles'
     networks:
       - gamest-network
+    restart: unless-stopped
 
   redis-exporter:
     image: oliver006/redis_exporter:latest
@@ -115,14 +116,37 @@ services:
     restart: unless-stopped
     networks:
       - gamest-network
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:latest
+    ports:
+      - "9113:9113"
+    command:
+      - -nginx.scrape-uri=http://nginx:80/stub_status
+    networks:
+      - gamest-network
   nats:
     image: nats:latest
     ports:
       - "4222:4222"
       - "8222:8222"
-    command: "--jetstream"
+    command: "--jetstream --http_port 8222"
     networks:
       - gamest-network
+    restart: unless-stopped
+  nats-exporter:
+    image: natsio/prometheus-nats-exporter:latest
+    ports:
+      - "7777:7777"  # Порт для экспорта метрик (можно выбрать любой)
+    command:
+    - "--varz"
+    - "--connz"
+    - "--healthz"
+    - "http://nats:8222"
+    depends_on:
+      - nats
+    networks:
+      - gamest-network
+    restart: unless-stopped
   node-exporter:
     image: prom/node-exporter:latest
     container_name: gamest-node-exporter
