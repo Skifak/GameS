@@ -50,10 +50,13 @@ jobs:
           
           # Копируем файлы
           scp -o StrictHostKeyChecking=no -i deploy_key -r dist server root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
-          scp -o StrictHostKeyChecking=no -i deploy_key package.json docker-compose.yml Dockerfile .env root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
+          scp -o StrictHostKeyChecking=no -i deploy_key package.json docker-compose.yml nginx.conf Dockerfile .env root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
           
           # Копируем конфигурации
           scp -o StrictHostKeyChecking=no -i deploy_key -r prometheus loki grafana promtail root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
+
+          # Копируем Supabase файлы
+          scp -o StrictHostKeyChecking=no -i deploy_key -r supabase/supabase/docker/volumes root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/supabase/
 
           # Запускаем контейнеры
           ssh -o StrictHostKeyChecking=no -i deploy_key root@${{ env.SERVER_HOST }} << 'EOF'

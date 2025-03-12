@@ -34,6 +34,10 @@ build
 *.sln
 *.sw?
 .error.txt
+supabase
+analise2.md
+analise.md
+ыф.md
 
 # Testing
 coverage
