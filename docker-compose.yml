@@ -22,11 +22,15 @@ services:
       NATS_URL: ${NATS_URL}
       SSL_CERT_PATH: /etc/ssl/certs/gamest.pem
       SSL_KEY_PATH: /etc/ssl/private/gamest.key
+    networks:
+      - gamest-network
 
   redis:
     image: "redis:latest"
     ports:
       - "6379:6379"
+    networks:
+      - gamest-network
 
   prometheus:
     image: prom/prometheus:latest
@@ -40,6 +44,8 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - gamest-network
 
   redis-exporter:
     image: oliver006/redis_exporter:latest
@@ -50,7 +56,8 @@ services:
     depends_on:
       redis:
         condition: service_started
-
+    networks:
+      - gamest-network
   grafana:
     image: grafana/grafana:latest
     ports:
@@ -67,6 +74,8 @@ services:
         condition: service_started
       loki:
         condition: service_started
+    networks:
+      - gamest-network
 
   loki:
     image: grafana/loki:latest
@@ -76,6 +85,8 @@ services:
       - ./loki/config.yml:/etc/loki/config.yml
       - loki-data:/loki
     command: -config.file=/etc/loki/config.yml
+    networks:
+      - gamest-network
 
   promtail:
     image: grafana/promtail:latest
@@ -88,6 +99,8 @@ services:
       - -client.url=${LOKI_URL}/loki/api/v1/push
     depends_on:
       - loki
+    networks:
+      - gamest-network
 
   nginx:
     image: nginx:latest
@@ -100,13 +113,16 @@ services:
       game-server:
         condition: service_started
     restart: unless-stopped
-
+    networks:
+      - gamest-network
   nats:
     image: nats:latest
     ports:
       - "4222:4222"
       - "8222:8222"
     command: "--jetstream"
+    networks:
+      - gamest-network
   node-exporter:
     image: prom/node-exporter:latest
     container_name: gamest-node-exporter
