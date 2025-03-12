@@ -1,3 +1,13 @@
 node_modules
 logs
 dist
+supabase
+docker
+tests
+
+.git
+.github
+.dockerignore
+Dockerfile
+.env.*
+.env.prod
