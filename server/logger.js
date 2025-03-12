@@ -68,7 +68,7 @@ const transports = [
 if (process.env.NODE_ENV === 'production') {
     transports.push(
         new LokiTransport({
-            host: 'http://loki:3101',
+            host: 'http://loki:3100',
             labels: {
                 job: 'game-server',
                 environment: process.env.NODE_ENV,

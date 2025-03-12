@@ -41,10 +41,6 @@ jobs:
       - name: Build client
         run: npm run build -- --mode ${{ env.DEPLOY_ENV }}
 
-      - name: Check contents of volumes/db
-        run: |
-          ls -al volumes/db
-
       - name: Deploy to server
         env:
           DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
@@ -52,24 +48,17 @@ jobs:
           echo "$DEPLOY_KEY" > deploy_key
           chmod 600 deploy_key
           
-          # Создаем директории если они не существуют
-          ssh -o StrictHostKeyChecking=no -i deploy_key root@${{ env.SERVER_HOST }} "mkdir -p ${{ env.SERVER_PATH }}/volumes/db"
-          
           # Копируем файлы
           scp -o StrictHostKeyChecking=no -i deploy_key -r dist server root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
           scp -o StrictHostKeyChecking=no -i deploy_key package.json docker-compose.yml Dockerfile .env root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
           
           # Копируем конфигурации
-          scp -o StrictHostKeyChecking=no -i deploy_key -r prometheus loki grafana promtail supabase root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
-          scp -o StrictHostKeyChecking=no -i deploy_key volumes/db/*.sql volumes/db/pg_hba.conf root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/volumes/db/
-          
-          # Проверяем содержимое после копирования
-          ssh -o StrictHostKeyChecking=no -i deploy_key root@${{ env.SERVER_HOST }} "ls -al ${{ env.SERVER_PATH }}/volumes/db/"
+          scp -o StrictHostKeyChecking=no -i deploy_key -r prometheus loki grafana promtail root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
 
           # Запускаем контейнеры
           ssh -o StrictHostKeyChecking=no -i deploy_key root@${{ env.SERVER_HOST }} << 'EOF'
             cd ${{ env.SERVER_PATH }}
-            docker compose down  # Убрали --volumes
+            docker compose down
             docker compose up --detach --build --remove-orphans
           EOF
           

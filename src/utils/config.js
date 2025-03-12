@@ -8,7 +8,6 @@ export const APP_ENV = import.meta.env.MODE || 'development';
 
 // Базовые URL для API и WebSocket с значениями по умолчанию
 export const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:2567';
-export const POCKETBASE_URL = import.meta.env.VITE_POCKETBASE_URL || 'http://localhost:8090';
 export const APP_VERSION = import.meta.env.VITE_APP_VERSION || '1.0.0';
 
 // Настройки в зависимости от окружения
@@ -43,4 +42,4 @@ export const CONFIG = {
 };
 
 // Экспортируем конфигурацию для текущей среды
-export default CONFIG[APP_ENV] || CONFIG.development; 
+export default CONFIG[APP_ENV] || CONFIG.development;

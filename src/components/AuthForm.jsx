@@ -1,8 +1,6 @@
 import { useState } from "react";
-import { useAuth } from "../hooks/useAuth";
 
 function AuthForm() {
-    const { signIn, signUp } = useAuth();
     const [isLogin, setIsLogin] = useState(true);
     const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
@@ -18,13 +16,15 @@ function AuthForm() {
         setLoading(true);
 
         try {
+            // Здесь можно добавить собственную логику аутентификации, например, через API
             if (isLogin) {
-                const { error } = await signIn(email, password);
-                if (error) throw error;
+                console.log("Login attempt with:", { email, password });
+                // Замени на собственный вызов API
+                setSuccessMessage("Вход выполнен (заглушка).");
             } else {
-                const { error } = await signUp(email, password, username);
-                if (error) throw error;
-                setSuccessMessage("Регистрация успешна! Теперь вы можете войти.");
+                console.log("Signup attempt with:", { username, email, password });
+                // Замени на собственный вызов API
+                setSuccessMessage("Регистрация успешна! Теперь вы можете войти (заглушка).");
                 setIsLogin(true);
                 setUsername("");
                 setEmail("");

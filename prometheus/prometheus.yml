@@ -19,12 +19,6 @@ scrape_configs:
       - targets: ["game-server:2567"]
     metrics_path: /metrics
 
-  # Мониторинг Supabase
-  - job_name: "supabase"
-    static_configs:
-      - targets: ["supabase-db:5432"]
-    metrics_path: /metrics
-
   # Мониторинг NATS
   - job_name: "nats"
     static_configs:
@@ -36,10 +30,10 @@ scrape_configs:
     static_configs:
       - targets: ["prometheus:9090"]
 
-  # Мониторинг Node.js метрик
+  # Мониторинг Node.js
   - job_name: "nodejs"
     static_configs:
-      - targets: ["game-server:9091"]
+      - targets: ["game-server:2567"]
     metrics_path: /metrics
 
   # Мониторинг Nginx
@@ -47,3 +41,15 @@ scrape_configs:
     static_configs:
       - targets: ["nginx-exporter:9113"]
     metrics_path: /metrics
+
+  # Мониторинг системы (node-exporter)
+  - job_name: "node"
+    static_configs:
+      - targets: ["node-exporter:9100"]  # Указываем порт node-exporter
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __address__
+        regex: (.*):9100
+        replacement: $1:9100
+      - source_labels: [__meta_host]
+        target_label: instance

@@ -5,12 +5,12 @@ import { monitor } from "@colyseus/monitor";
 import { createClient } from "redis";
 import http from "http";
 import dotenv from "dotenv";
-import { register, login } from "./auth.js";
+
 import logger from "./logger.js";
 import config from "./config.js";
 import cors from "cors";
 import jwt from "jsonwebtoken";
-import { metricsMiddleware } from './metrics.js';
+import { metrics, metricsMiddleware } from './metrics.js'; // Импортируем метрики
 
 dotenv.config();
 
@@ -24,9 +24,7 @@ async function initRedis() {
     redisClient = createClient({
         url: config.redisUrl
     });
-    redisClient.on("error", (err) => {
-        logger.error("Redis Client Error", err);
-    });
+    redisClient.on("error", (err) => logger.error("Redis Client Error", err));
     try {
         await redisClient.connect();
         logger.info("Connected to Redis");
@@ -42,10 +40,6 @@ const app = express();
 app.use(cors(config.cors));
 app.use(express.json());
 
-// Маршруты авторизации
-app.post("/api/auth/register", register);
-app.post("/api/auth/login", login);
-
 // Эндпоинт для метрик Prometheus
 app.get('/metrics', metricsMiddleware);
 
@@ -56,6 +50,7 @@ const gameServer = new Server({ transport });
 class HexRoom extends Room {
     onCreate(options) {
         logger.info("Hex room created");
+        this.updateMetrics(); // Обновляем метрики при создании комнаты
     }
 
     async onAuth(client, options) {
@@ -78,6 +73,7 @@ class HexRoom extends Room {
                 logger.warn(`Failed to set Redis key: ${error.message}`);
             }
         }
+        this.updateMetrics(); // Обновляем метрики при подключении игрока
     }
 
     async onLeave(client, consented) {
@@ -89,30 +85,35 @@ class HexRoom extends Room {
                 logger.warn(`Failed to delete Redis key: ${error.message}`);
             }
         }
+        this.updateMetrics(); // Обновляем метрики при отключении игрока
+        if (!consented) {
+            metrics.incrementPlayerDisconnects(); // Увеличиваем счётчик отключений
+        }
+        // Симуляция ошибок синхронизации (замени на реальную логику)
+        if (Math.random() < 0.1) {
+            metrics.incrementSyncErrors();
+        }
+    }
+
+    onMessage(client, message) {
+        // Пример: измеряем задержку обработки сообщения
+        const start = Date.now();
+        // Здесь должна быть логика обработки сообщения
+        const latency = (Date.now() - start) / 1000; // Задержка в секундах
+        metrics.recordRoomLatency(latency);
+    }
+
+    updateMetrics() {
+        const totalClients = this.clients?.length || 0;
+        metrics.updateActiveSessions(totalClients); // Обновляем количество активных сессий
+        // Пример: симуляция использования памяти (замени на реальное значение)
+        metrics.updateRoomMemory(totalClients * 1024 * 1024); // Пример: 1MB на клиента
     }
 }
 
 (async () => {
     await initRedis();
     gameServer.define("hex", HexRoom);
-    
-    // Перемещаем эндпоинт метрик сюда
-    app.get("/metrics", async (req, res) => {
-        try {
-            const rooms = await gameServer.matchMaker.getAvailableRooms("hex");
-            const totalClients = rooms.reduce((sum, room) => sum + (room.clients || 0), 0);
-
-            let metrics = "";
-            metrics += `# HELP colyseus_clients_total Total number of connected clients\n`;
-            metrics += `# TYPE colyseus_clients_total gauge\n`;
-            metrics += `colyseus_clients_total ${totalClients}\n`;
-            res.set("Content-Type", "text/plain");
-            res.send(metrics);
-        } catch (err) {
-            logger.error("Error fetching metrics", err);
-            res.status(500).send("Error fetching metrics");
-        }
-    });
 
     app.use("/colyseus", monitor());
     server.listen(config.port, () => logger.info(`Game server running on port ${config.port}`));

@@ -41,16 +41,6 @@ groups:
           summary: Redis is down (instance {{ $labels.instance }})
           description: Redis instance is down\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}
 
-      # Алерт на проблемы с базой данных
-      - alert: DatabaseDown
-        expr: pg_up == 0
-        for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: Database is down (instance {{ $labels.instance }})
-          description: PostgreSQL instance is down\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}
-
       # Алерт на высокую латентность API
       - alert: HighAPILatency
         expr: http_request_duration_seconds{quantile="0.9"} > 1

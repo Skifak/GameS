@@ -13,9 +13,7 @@ export default defineConfig(({ command, mode }) => {
   const useLocalEnv = fs.existsSync('.env.local') && command === 'serve';
   
   console.log(`Running in ${mode} mode with ${useLocalEnv ? '.env.local' : '.env'} configuration`);
-  
-  const isProduction = mode === 'production';
-  
+ 
   const baseConfig = {
     plugins: [react()],
     resolve: {
@@ -29,11 +27,8 @@ export default defineConfig(({ command, mode }) => {
     define: {
       __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
       __APP_ENV__: JSON.stringify(mode),
-      __IS_DEV__: !isProduction,
-      __IS_PROD__: isProduction,
-      __API_URL__: isProduction 
-        ? JSON.stringify('https://150.241.69.143')
-        : JSON.stringify('http://localhost:2567')
+      __IS_DEV__: mode === 'development',
+      __IS_PROD__: mode === 'production'
     },
     // Настройка для использования .env.local при локальной разработке
     envDir: process.cwd(),
@@ -47,20 +42,19 @@ export default defineConfig(({ command, mode }) => {
       server: {
         port: parseInt(env.CLIENT_PORT || '3002'),
         strictPort: true,
-        proxy: isProduction ? {
+        proxy: {
           '/api': {
-            target: 'https://150.241.69.143',
+            target: 'http://localhost:2567',
             changeOrigin: true,
-            secure: true,
+            secure: false,
+            rewrite: (path) => path
           },
-          '/auth': {
-            target: 'https://150.241.69.143',
+          '/colyseus': {
+            target: 'http://localhost:2567',
             changeOrigin: true,
-            secure: true,
+            secure: false,
+            ws: true
           }
-        } : {
-          '/api': 'http://localhost:2567',
-          '/auth': 'http://localhost:9999'
         }
       }
     };
@@ -70,8 +64,8 @@ export default defineConfig(({ command, mode }) => {
       ...baseConfig,
       build: {
         outDir: 'dist',
-        sourcemap: !isProduction,
-        minify: isProduction,
+        sourcemap: false,
+        minify: true,
         rollupOptions: {
           output: {
             manualChunks: {
@@ -83,4 +77,4 @@ export default defineConfig(({ command, mode }) => {
       }
     };
   }
-}); 
+});

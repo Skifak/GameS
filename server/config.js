@@ -58,9 +58,6 @@ const baseConfig = {
   redisUrl: getServiceUrl('REDIS_URL', 'redis://redis:6379', 6379),
   natsUrl: getServiceUrl('NATS_URL', 'nats://nats:4222', 4222),
   jwtSecret: process.env.JWT_SECRET || 'dev-secret-key-do-not-use-in-production',
-  supabaseUrl: process.env.SUPABASE_URL || 'http://localhost:9999',
-  supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
-  supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY,
   logDir: path.join(__dirname, '../logs'),
   isLocalDev,
   isDocker
@@ -79,7 +76,6 @@ const envConfig = {
     },
     // Флаги для обработки недоступных сервисов в режиме разработки
     allowMissingRedis: true,
-    allowMissingPocketBase: true,
     allowMissingNats: true,
     allowMissingLoki: true,
     mockAuthInDev: true
@@ -94,8 +90,7 @@ const envConfig = {
       allowedHeaders: ['Content-Type', 'Authorization']
     },
     // В Docker-контейнере разрешаем отсутствие сервисов и в production
-    allowMissingRedis: isDocker,
-    allowMissingPocketBase: isDocker,
+    allowMissingRedis: false,
     allowMissingNats: isDocker,
     allowMissingLoki: isDocker,
     mockAuthInDev: isDocker
@@ -114,11 +109,8 @@ if (NODE_ENV === 'production') {
   if (baseConfig.jwtSecret === 'dev-secret-key-do-not-use-in-production') {
     console.warn('WARNING: Using default JWT secret in production environment!');
   }
-  if (!baseConfig.supabaseAnonKey || !baseConfig.supabaseServiceKey) {
-    console.warn('WARNING: Missing Supabase keys in production environment!');
-  }
 }
 
 console.log(`Server running in ${NODE_ENV} environment${isLocalDev ? ' with local configuration' : ''}${isDocker ? ' in Docker container' : ''}`);
 
-export default config; 
+export default config;
