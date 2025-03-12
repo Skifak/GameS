@@ -1,6 +1,4 @@
 name: gamest
-env_file:
-  - .env
 services:
   game-server:
     build:
