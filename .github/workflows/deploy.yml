@@ -45,7 +45,7 @@ jobs:
           scp -o StrictHostKeyChecking=no -i deploy_key -r prometheus loki grafana promtail root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
 
           # Копируем Supabase файлы
-          scp -o StrictHostKeyChecking=no -i deploy_key -r supabase/supabase/docker root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/supabase/
+          scp -o StrictHostKeyChecking=no -i deploy_key -r docker root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/supabase/
 
           # Запускаем контейнеры.
           ssh -o StrictHostKeyChecking=no -i deploy_key root@${{ env.SERVER_HOST }} << 'EOF'
