@@ -33,7 +33,7 @@ services:
       file: docker-compose.yml
       service: grafana
     ports:
-      - "3000:3000"
+      - "3200:3000"
 
   loki:
     extends:
@@ -81,3 +81,8 @@ services:
 networks:
   gamest-shared-network:
     external: true
+
+volumes:
+  grafana-storage: {}
+  prometheus-data: {}
+  loki-data: {}
