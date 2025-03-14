@@ -53,7 +53,7 @@ jobs:
             docker network create gamest-shared-network || true
             docker compose -f docker-compose.${{ env.DEPLOY_ENV }}.yml down
             docker compose -f docker-compose.${{ env.DEPLOY_ENV }}.yml up --detach --build --remove-orphans
-            cd supabase
+            cd supabase/docker
             docker compose -f docker-compose.yml down
             docker compose -f docker-compose.yml up --detach --build --remove-orphans
           EOF
