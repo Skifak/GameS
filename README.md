@@ -1,21 +1,3 @@
-test@example.com
-password123
-
-
-# GameST
-
-Многопользовательская игра на базе Phaser.js и React с серверной частью на Node.js и Colyseus.
-
-text
-
-Свернуть
-
-Перенос
-
-Копировать
-test@example.com
-password123
-
 # GameST
 
 Многопользовательская игра на базе Phaser.js и React с серверной частью на Node.js и Colyseus.

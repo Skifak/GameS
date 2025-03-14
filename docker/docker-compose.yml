@@ -26,6 +26,11 @@ services:
       timeout: 10s
       interval: 5s
       retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       STUDIO_PG_META_URL: http://meta:8080
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -47,6 +52,8 @@ services:
       NEXT_ANALYTICS_BACKEND_PROVIDER: postgres
       # Uncomment to use Big Query backend for analytics
       # NEXT_ANALYTICS_BACKEND_PROVIDER: bigquery
+    networks:
+      - gamest-shared-network
 
   kong:
     container_name: supabase-kong
@@ -72,6 +79,13 @@ services:
       DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD}
     # https://unix.stackexchange.com/a/294837
     entrypoint: bash -c 'eval "echo \"$$(cat ~/temp.yml)\"" > ~/kong.yml && /docker-entrypoint.sh kong docker-start'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - gamest-shared-network
 
   auth:
     container_name: supabase-auth
@@ -155,6 +169,13 @@ services:
       # GOTRUE_HOOK_SEND_EMAIL_ENABLED: "false"
       # GOTRUE_HOOK_SEND_EMAIL_URI: "http://host.docker.internal:54321/functions/v1/email_sender"
       # GOTRUE_HOOK_SEND_EMAIL_SECRETS: "v1,whsec_VGhpcyBpcyBhbiBleGFtcGxlIG9mIGEgc2hvcnRlciBCYXNlNjQgc3RyaW5n"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - gamest-shared-network
 
   rest:
     container_name: supabase-rest
@@ -174,10 +195,17 @@ services:
       PGRST_DB_USE_LEGACY_GUCS: "false"
       PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET}
       PGRST_APP_SETTINGS_JWT_EXP: ${JWT_EXPIRY}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     command:
       [
         "postgrest"
       ]
+    networks:
+      - gamest-shared-network
 
   realtime:
     # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
@@ -223,6 +251,13 @@ services:
       APP_NAME: realtime
       SEED_SELF_HOST: true
       RUN_JANITOR: true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - gamest-shared-network
 
   # To use S3 backed storage: docker compose -f docker-compose.yml -f docker-compose.s3.yml up
   storage:
@@ -267,6 +302,13 @@ services:
       GLOBAL_S3_BUCKET: stub
       ENABLE_IMAGE_TRANSFORMATION: "true"
       #IMGPROXY_URL: http://imgproxy:5001
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - gamest-shared-network
 
   #imgproxy:
   #  container_name: supabase-imgproxy
@@ -309,6 +351,13 @@ services:
       PG_META_DB_NAME: ${POSTGRES_DB}
       PG_META_DB_USER: supabase_admin
       PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - gamest-shared-network
 
   #functions:
     #container_name: supabase-edge-functions
@@ -430,6 +479,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXP: ${JWT_EXPIRY}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     command:
       [
         "postgres",
@@ -438,6 +492,8 @@ services:
         "-c",
         "log_min_messages=fatal" # prevents Realtime polling queries from appearing in logs
       ]
+    networks:
+      - gamest-shared-network
 
   #vector:
   #  container_name: supabase-vector
@@ -513,16 +569,24 @@ services:
       POOLER_DEFAULT_POOL_SIZE: ${POOLER_DEFAULT_POOL_SIZE}
       POOLER_MAX_CLIENT_CONN: ${POOLER_MAX_CLIENT_CONN}
       POOLER_POOL_MODE: transaction
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     command:
       [
         "/bin/sh",
         "-c",
         "/app/bin/migrate && /app/bin/supavisor eval \"$$(cat /etc/pooler/pooler.exs)\" && /app/bin/server"
       ]
+    networks:
+      - gamest-shared-network
 
 volumes:
   db-config:
+  supabase-db-data: {}
+
 networks:
-  default:
-    name: gamest_gamest-network
+  gamest-shared-network:
     external: true

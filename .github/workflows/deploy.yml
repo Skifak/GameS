@@ -4,15 +4,15 @@ on:
   push:
     branches:
       - main
-      - develop
+      - stage
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      DEPLOY_ENV: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
-      SERVER_HOST: ${{ github.ref == 'refs/heads/main' && '150.241.69.143' || 'localhost' }}
-      SERVER_PATH: ${{ github.ref == 'refs/heads/main' && '/opt/serv-game' || '/opt/serv-game-dev' }}
+      DEPLOY_ENV: ${{ github.ref == 'refs/heads/main' && 'prod' || 'stage' }}
+      SERVER_HOST: ${{ github.ref == 'refs/heads/main' && '202.49.176.236' || '150.241.69.143' }}
+      SERVER_PATH: /opt/serv-game
     
     steps:
       - name: Checkout code
@@ -27,17 +27,6 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Prepare environment file
-        run: |
-          if [ "${{ env.DEPLOY_ENV }}" = "production" ]; then
-            echo "Using production environment"
-            cp .env.prod .env
-          else
-            echo "Using development environment"
-            cp .env .env.tmp
-            mv .env.tmp .env
-          fi
-
       - name: Build client
         run: npm run build -- --mode ${{ env.DEPLOY_ENV }}
 
@@ -48,21 +37,25 @@ jobs:
           echo "$DEPLOY_KEY" > deploy_key
           chmod 600 deploy_key
           
-          # Копируем файлы
+          # Копируем файлы основного стека
           scp -o StrictHostKeyChecking=no -i deploy_key -r dist server root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
-          scp -o StrictHostKeyChecking=no -i deploy_key package.json docker-compose.yml nginx.conf Dockerfile .env root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
+          scp -o StrictHostKeyChecking=no -i deploy_key package.json docker-compose.yml docker-compose.${{ env.DEPLOY_ENV }}.yml nginx.conf Dockerfile root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
           
           # Копируем конфигурации
           scp -o StrictHostKeyChecking=no -i deploy_key -r prometheus loki grafana promtail root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
 
           # Копируем Supabase файлы
-          scp -o StrictHostKeyChecking=no -i deploy_key -r docker/volumes root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/supabase/
+          scp -o StrictHostKeyChecking=no -i deploy_key -r docker root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/supabase/
 
-          # Запускаем контейнеры
+          # Запускаем контейнеры.
           ssh -o StrictHostKeyChecking=no -i deploy_key root@${{ env.SERVER_HOST }} << 'EOF'
             cd ${{ env.SERVER_PATH }}
-            docker compose down
-            docker compose up --detach --build --remove-orphans
+            docker network create gamest-shared-network || true
+            docker compose -f docker-compose.${{ env.DEPLOY_ENV }}.yml down
+            docker compose -f docker-compose.${{ env.DEPLOY_ENV }}.yml up --detach --build --remove-orphans
+            cd supabase/docker
+            docker compose -f docker-compose.yml down
+            docker compose -f docker-compose.yml up --detach --build --remove-orphans
           EOF
           
           rm deploy_key
