@@ -47,7 +47,7 @@ jobs:
           # Копируем Supabase файлы
           scp -o StrictHostKeyChecking=no -i deploy_key -r supabase/supabase/docker root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/supabase/
 
-          # Запускаем контейнеры
+          # Запускаем контейнеры.
           ssh -o StrictHostKeyChecking=no -i deploy_key root@${{ env.SERVER_HOST }} << 'EOF'
             cd ${{ env.SERVER_PATH }}
             docker network create gamest-shared-network || true
