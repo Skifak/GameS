@@ -10,7 +10,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      DEPLOY_ENV: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+      DEPLOY_ENV: ${{ github.ref == 'refs/heads/main' && 'prod' || 'stage' }}
       SERVER_HOST: ${{ github.ref == 'refs/heads/main' && '202.49.176.236' || '150.241.69.143' }}
       SERVER_PATH: /opt/serv-game
     
