@@ -1,0 +1,66 @@
+name: gamest-prod
+env_file:
+  - .env
+services:
+  game-server:
+    extends:
+      file: docker-compose.yml
+      service: game-server
+
+  redis:
+    extends:
+      file: docker-compose.yml
+      service: redis
+
+  prometheus:
+    extends:
+      file: docker-compose.yml
+      service: prometheus
+
+  redis-exporter:
+    extends:
+      file: docker-compose.yml
+      service: redis-exporter
+
+  grafana:
+    extends:
+      file: docker-compose.yml
+      service: grafana
+
+  loki:
+    extends:
+      file: docker-compose.yml
+      service: loki
+
+  nginx:
+    extends:
+      file: docker-compose.yml
+      service: nginx
+    ports:
+      - "80:80"
+      # Раскомментируй, когда добавишь SSL
+      # - "443:443"
+
+  nginx-exporter:
+    extends:
+      file: docker-compose.yml
+      service: nginx-exporter
+
+  nats:
+    extends:
+      file: docker-compose.yml
+      service: nats
+
+  nats-exporter:
+    extends:
+      file: docker-compose.yml
+      service: nats-exporter
+
+  node-exporter:
+    extends:
+      file: docker-compose.yml
+      service: node-exporter
+
+networks:
+  gamest-shared-network:
+    external: true

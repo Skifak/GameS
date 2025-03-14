@@ -1,0 +1,85 @@
+name: gamest-dev
+env_file:
+  - .env
+services:
+  game-server:
+    extends:
+      file: docker-compose.yml
+      service: game-server
+    ports:
+      - "2567:2567"
+
+  redis:
+    extends:
+      file: docker-compose.yml
+      service: redis
+    ports:
+      - "6379:6379"
+
+  prometheus:
+    extends:
+      file: docker-compose.yml
+      service: prometheus
+    ports:
+      - "9090:9090"
+
+  redis-exporter:
+    extends:
+      file: docker-compose.yml
+      service: redis-exporter
+    ports:
+      - "9121:9121"
+
+  grafana:
+    extends:
+      file: docker-compose.yml
+      service: grafana
+    ports:
+      - "3000:3000"
+
+  loki:
+    extends:
+      file: docker-compose.yml
+      service: loki
+    ports:
+      - "3101:3100"
+
+  nginx:
+    extends:
+      file: docker-compose.yml
+      service: nginx
+    ports:
+      - "80:80"
+
+  nginx-exporter:
+    extends:
+      file: docker-compose.yml
+      service: nginx-exporter
+    ports:
+      - "9113:9113"
+
+  nats:
+    extends:
+      file: docker-compose.yml
+      service: nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+
+  nats-exporter:
+    extends:
+      file: docker-compose.yml
+      service: nats-exporter
+    ports:
+      - "7777:7777"
+
+  node-exporter:
+    extends:
+      file: docker-compose.yml
+      service: node-exporter
+    ports:
+      - "9100:9100"
+
+networks:
+  gamest-shared-network:
+    external: true
