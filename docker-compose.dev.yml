@@ -1,6 +1,4 @@
 name: gamest-dev
-env_file:
-  - .env
 services:
   game-server:
     extends:
