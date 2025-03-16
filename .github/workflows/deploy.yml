@@ -74,7 +74,7 @@ jobs:
               fi
             done
             
-            # Проверяем, все ли контейнеры запустились
+            # Проверяем, все ли контейнеры запустились.
             if ! docker compose -f docker-compose.${{ env.DEPLOY_ENV }}.yml ps | grep "Up" | wc -l | grep -q "$(docker compose -f docker-compose.${{ env.DEPLOY_ENV }}.yml config --services | wc -l)"; then
               echo "Error: Not all containers in main stack are up!"
               docker compose -f docker-compose.${{ env.DEPLOY_ENV }}.yml ps
