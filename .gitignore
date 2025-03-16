@@ -36,9 +36,7 @@ build
 *.sw?
 .error.txt
 supabase
-analise2.md
-analise.md
-ыф.md
+supabase_old
 logs
 node_modules
 .cursor

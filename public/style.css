@@ -1,48 +1,203 @@
-body {
+:root {
+    --black: #000;
+    --white: #fff;
+    --green: #4B712E;
+    --orange: #ffcf5b;
+    --armadillo: #43423d;
+    --armadillo2: #43403b;
+    --black-haze: #f7f7f7;
+    --black: #1f1f1f;
+    --boulder: #757575;
+    --chicago2: #5a5a5a;
+    --chicago: #595959;
+    --dimgrey: #676767;
+    --dove-gray2: #727272;
+    --dove-gray3: #6b6b6b;
+    --masala: #3e3e3e;
+    --outer-space: #4c4c4c;
+    --seashell: #f0f0f0;
+    --silver-chalice2: #b2b0ac;
+    --silver-chalice: #aeaeae;
+    --woodsmoke2: #151413;
+    --woodsmoke3: #111;
+    --woodsmoke: #161514;
+    --contentBg: var(--woodsmoke3);
+    --contentBgBorder: var(--armadillo2);
+  }
+  
+  body {
     margin: 0;
     padding: 0;
-    color: rgba(255, 255, 255, 0.87);
-    background-color: #000000; 
-    font-family: Arial, Helvetica, sans-serif;
-}
-
-#app {
-    width: 100%;
-    height: 100vh;
     overflow: hidden;
+    background-color: var(--black);
+    height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
-}
-
-.spritePosition {
-    margin: 10px 0 0 10px;
-    font-size: 0.8em;
-}
-
-.button {
-    width: 140px;
-    margin: 10px;
+    font-family: Verdana, Arial, Helvetica, sans-serif;
+  }
+  
+  #game-container {
+    width: calc(100vw - 20px);
+    height: calc(100vh - 20px);
+    border: 10px solid var(--armadillo);
+    box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .interface {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+  }
+  
+  .interface > * {
+    pointer-events: auto;
+  }
+  
+  .auth-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background-color: var(--woodsmoke);
+    color: var(--silver-chalice);
+  }
+  
+  .auth-container h1 {
+    font-size: 12px;
+    margin-bottom: 20px;
+    color: var(--orange);
+  }
+  
+  .auth-container p {
+    font-size: 10px;
+    margin-bottom: 30px;
+    text-align: center;
+    max-width: 500px;
+  }
+  
+  .auth-input {
+    width: 250px;
+    margin: 10px 0;
     padding: 10px;
-    background-color: #000000;
-    color: rgba(255, 255, 255, 0.87);
-    border: 1px solid rgba(255, 255, 255, 0.87);
+    background-color: var(--masala);
+    border: 1px solid var(--outer-space);
+    color: var(--silver-chalice);
+    font-size: 10px;
+  }
+  
+  .auth-button {
+    width: 270px;
+    margin: 10px 0;
+    padding: 12px;
+    background-color: var(--masala);
+    color: var(--silver-chalice);
+    border: 1px solid var(--outer-space);
     cursor: pointer;
+    font-size: 10px;
     transition: all 0.3s;
-
-    &:hover {
-        border: 1px solid #0ec3c9;
-        color: #0ec3c9;
-    }
-
-    &:active {
-        background-color: #0ec3c9;
-    }
-
-    /* Disabled styles */
-    &:disabled {
-        cursor: not-allowed;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        color: rgba(255, 255, 255, 0.3);
-    }
-}
+  }
+  
+  .auth-button:hover {
+    border-color: var(--green);
+    color: var(--green);
+  }
+  
+  .auth-button:active {
+    background-color: var(--dove-gray3);
+  }
+  
+  .auth-button:disabled {
+    cursor: not-allowed;
+    border: 1px solid var(--dimgrey);
+    color: var(--dimgrey);
+  }
+  
+  .auth-error {
+    color: #ff6b6b;
+    font-size: 10px;
+    margin-top: 10px;
+  }
+  
+  .auth-success {
+    color: var(--green);
+    font-size: 10px;
+    margin-top: 10px;
+  }
+  
+  .back-button {
+    margin-top: 20px;
+    background: none;
+    border: none;
+    color: var(--green);
+    cursor: pointer;
+    font-size: 10px;
+  }
+  
+  .back-button:hover {
+    text-decoration: underline;
+  }
+  
+  .back-button:disabled {
+    color: var(--dimgrey);
+    cursor: not-allowed;
+  }
+  
+  .info-panel {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 180px;
+    height: 200px;
+    background-color: var(--woodsmoke);
+    border: 1px solid var(--outer-space);
+    color: var(--silver-chalice);
+    padding: 4px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .location-name {
+    font-size: 12px;
+    margin: 0;
+    padding-top: 10px;
+    color: var(--orange);
+    text-align: left;
+  }
+  
+  .tab-content-buttons {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    padding: 5px 0;
+    position: absolute;
+    bottom: 5px;
+    left: 0;
+  }
+  
+  .profile-text,
+  .logout-text {
+    background: none;
+    border: none;
+    color: var(--green);
+    cursor: pointer;
+    font-size: 10px;
+  }
+  
+  .profile-text:hover,
+  .logout-text:hover {
+    text-decoration: underline;
+  }
+  
+  #game-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
