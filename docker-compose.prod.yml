@@ -59,6 +59,11 @@ services:
       file: docker-compose.yml
       service: node-exporter
 
+volumes:
+  grafana-storage: {}
+  prometheus-data: {}
+  loki-data: {}
+  
 networks:
   gamest-shared-network:
     external: true
