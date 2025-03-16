@@ -1,11 +1,21 @@
+/**
+ * Главный компонент приложения.
+ * Управляет аутентификацией и отображением игры Phaser.
+ * @module App
+ */
+
 import { useRef } from 'react';
 import Phaser from 'phaser';
 import { PhaserGame } from './game/PhaserGame';
 import AuthForm from './components/AuthForm';
 import { useAuth } from './hooks/useAuth';
 
+/**
+ * Компонент приложения.
+ * @returns {JSX.Element} Основной интерфейс приложения
+ */
 function App() {
-    const { isAuthenticated, loading, user, logout } = useAuth();
+    const { isAuthenticated, loading, user, signOut: logout } = useAuth(); // Переименовал signOut в logout для совместимости с кодом
     const phaserRef = useRef();
 
     if (loading) {

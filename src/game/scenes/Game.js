@@ -1,13 +1,29 @@
+/**
+ * Сцена игры для Phaser.
+ * Отображает базовый игровой экран и управляет переключением сцен.
+ * @module GameScene
+ */
+
 import { EventBus } from '../EventBus';
 import { Scene } from 'phaser';
 
+/**
+ * Класс сцены основной игры.
+ * @extends Scene
+ */
 export class Game extends Scene
 {
+    /**
+     * Создаёт экземпляр сцены игры.
+     */
     constructor ()
     {
         super('Game');
     }
 
+    /**
+     * Инициализирует сцену, добавляя фон и текст.
+     */
     create ()
     {
         this.cameras.main.setBackgroundColor(0x00ff00);
@@ -23,6 +39,9 @@ export class Game extends Scene
         EventBus.emit('current-scene-ready', this);
     }
 
+    /**
+     * Переключает текущую сцену на 'GameOver'.
+     */
     changeScene ()
     {
         this.scene.start('GameOver');

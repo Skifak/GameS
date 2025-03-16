@@ -1,16 +1,31 @@
 /**
  * Конфигурационный файл для клиентской части приложения
  * Централизует доступ к переменным окружения и другим настройкам
+ * @module ClientConfig
  */
 
-// Определяем текущую среду
+/**
+ * Текущая среда приложения (development, staging, production).
+ * @type {string}
+ */
 export const APP_ENV = import.meta.env.MODE || 'development';
 
-// Базовые URL для API и WebSocket с значениями по умолчанию
+/**
+ * URL для WebSocket-соединения.
+ * @type {string}
+ */
 export const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:2567';
+
+/**
+ * Версия приложения.
+ * @type {string}
+ */
 export const APP_VERSION = import.meta.env.VITE_APP_VERSION || '1.0.0';
 
-// Настройки в зависимости от окружения
+/**
+ * Конфигурации для разных сред.
+ * @type {Object}
+ */
 export const CONFIG = {
   development: {
     apiTimeout: 10000,
@@ -41,5 +56,8 @@ export const CONFIG = {
   }
 };
 
-// Экспортируем конфигурацию для текущей среды
+/**
+ * Конфигурация для текущей среды.
+ * @type {Object}
+ */
 export default CONFIG[APP_ENV] || CONFIG.development;

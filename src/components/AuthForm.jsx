@@ -1,5 +1,15 @@
+/**
+ * React-компонент формы аутентификации.
+ * Предоставляет интерфейс для входа и регистрации пользователей с переключением между режимами.
+ * @module AuthForm
+ */
+
 import { useState } from "react";
 
+/**
+ * Компонент формы для входа или регистрации пользователя.
+ * @returns {JSX.Element} Элемент формы аутентификации
+ */
 function AuthForm() {
     const [isLogin, setIsLogin] = useState(true);
     const [username, setUsername] = useState("");
@@ -9,6 +19,11 @@ function AuthForm() {
     const [loading, setLoading] = useState(false);
     const [successMessage, setSuccessMessage] = useState("");
 
+    /**
+     * Обработчик отправки формы аутентификации.
+     * @param {Object} e - Событие формы
+     * @async
+     */
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");

@@ -1,0 +1,9 @@
+{
+    "name": "game-st-docs",
+    "cwd": "./",
+    "src": "docs",
+    "filePattern": "api.md",
+    "dist": "docs/api.json",
+    "metadata": true,
+    "deterministicOrder": false
+  }

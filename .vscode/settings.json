@@ -1,3 +1,4 @@
 {
-    "docwriter.style": "Auto-detect"
+    "docwriter.style": "Auto-detect",
+    "makefile.makefilePath": "D:\\phaser_project\\GameST\\Makefile"
 }

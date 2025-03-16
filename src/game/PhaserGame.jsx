@@ -1,8 +1,21 @@
+/**
+ * React-компонент для интеграции игры Phaser в приложение.
+ * Управляет созданием и уничтожением игры, а также передачей активной сцены.
+ * @module PhaserGame
+ */
+
 import PropTypes from 'prop-types';
 import { forwardRef, useEffect, useLayoutEffect, useRef } from 'react';
 import StartGame from './main';
 import { EventBus } from './EventBus';
 
+/**
+ * Компонент PhaserGame, обёрнутый в forwardRef для передачи ссылки на игру.
+ * @param {Object} props - Свойства компонента
+ * @param {Function} [props.currentActiveScene] - Коллбэк для получения текущей сцены
+ * @param {Object} ref - Ссылка на объект с игрой и сценой
+ * @returns {JSX.Element} Элемент контейнера игры
+ */
 export const PhaserGame = forwardRef(function PhaserGame ({ currentActiveScene }, ref)
 {
     const game = useRef();
@@ -59,5 +72,9 @@ export const PhaserGame = forwardRef(function PhaserGame ({ currentActiveScene }
 
 // Props definitions
 PhaserGame.propTypes = {
+    /**
+     * Функция для обработки текущей активной сцены.
+     * @type {Function}
+     */
     currentActiveScene: PropTypes.func 
 }

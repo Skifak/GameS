@@ -1,20 +1,40 @@
+/**
+ * Модуль для работы с аутентификацией через API.
+ * Предоставляет функции для регистрации, входа и управления данными пользователя.
+ * @module Auth
+ */
+
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-export interface User {
-    id: string;
-    email: string;
-    username: string;
-}
+/**
+ * Интерфейс пользователя.
+ * @typedef {Object} User
+ * @property {string} id - Уникальный идентификатор
+ * @property {string} email - Электронная почта
+ * @property {string} username - Имя пользователя
+ */
 
-export interface AuthResponse {
-    user: User;
-    token: string;
-}
+/**
+ * Ответ аутентификации.
+ * @typedef {Object} AuthResponse
+ * @property {User} user - Данные пользователя
+ * @property {string} token - Токен доступа
+ */
 
+/**
+ * Объект методов аутентификации.
+ */
 export const auth = {
-    // Регистрация
+    /**
+     * Регистрирует нового пользователя.
+     * @async
+     * @param {string} email - Электронная почта
+     * @param {string} password - Пароль
+     * @param {string} username - Имя пользователя
+     * @returns {Promise<AuthResponse>} Данные пользователя и токен
+     */
     signUp: async (email: string, password: string, username: string): Promise<AuthResponse> => {
         const response = await axios.post(`${API_URL}/api/auth/register`, {
             email,
@@ -24,7 +44,13 @@ export const auth = {
         return response.data;
     },
 
-    // Вход
+    /**
+     * Выполняет вход пользователя.
+     * @async
+     * @param {string} email - Электронная почта
+     * @param {string} password - Пароль
+     * @returns {Promise<AuthResponse>} Данные пользователя и токен
+     */
     signIn: async (email: string, password: string): Promise<AuthResponse> => {
         const response = await axios.post(`${API_URL}/api/auth/login`, {
             email,
@@ -33,26 +59,38 @@ export const auth = {
         return response.data;
     },
 
-    // Выход
+    /**
+     * Выполняет выход пользователя.
+     * @async
+     */
     signOut: async () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
     },
 
-    // Получение текущего пользователя
+    /**
+     * Возвращает текущего пользователя из локального хранилища.
+     * @returns {User|null} Данные пользователя или null
+     */
     getCurrentUser: (): User | null => {
         const userStr = localStorage.getItem('user');
         return userStr ? JSON.parse(userStr) : null;
     },
 
-    // Получение токена
+    /**
+     * Возвращает токен из локального хранилища.
+     * @returns {string|null} Токен или null
+     */
     getToken: (): string | null => {
         return localStorage.getItem('token');
     },
 
-    // Установка данных аутентификации
+    /**
+     * Сохраняет данные аутентификации в локальное хранилище.
+     * @param {AuthResponse} data - Данные аутентификации
+     */
     setAuth: (data: AuthResponse) => {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
     }
-}; 
+};
