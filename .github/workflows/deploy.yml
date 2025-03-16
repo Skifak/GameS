@@ -30,13 +30,18 @@ jobs:
       - name: Build client
         run: npm run build -- --mode ${{ env.DEPLOY_ENV }}
 
-      - name: Deploy to server
+      - name: Deploy to server - Copy files
         env:
           DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
         run: |
           echo "$DEPLOY_KEY" > deploy_key
           chmod 600 deploy_key
           
+          # Очищаем старую папку dist на сервере перед копированием
+          ssh -o StrictHostKeyChecking=no -i deploy_key root@${{ env.SERVER_HOST }} << 'EOF'
+            rm -rf ${{ env.SERVER_PATH }}/dist
+          EOF
+
           # Копируем файлы основного стека
           scp -o StrictHostKeyChecking=no -i deploy_key -r dist server root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
           scp -o StrictHostKeyChecking=no -i deploy_key package.json docker-compose.yml docker-compose.${{ env.DEPLOY_ENV }}.yml nginx.conf Dockerfile root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/
@@ -47,17 +52,69 @@ jobs:
           # Копируем Supabase файлы
           scp -o StrictHostKeyChecking=no -i deploy_key -r docker root@${{ env.SERVER_HOST }}:${{ env.SERVER_PATH }}/supabase/
 
-          # Запускаем контейнеры.
+      - name: Deploy to server - Start main stack
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
           ssh -o StrictHostKeyChecking=no -i deploy_key root@${{ env.SERVER_HOST }} << 'EOF'
             cd ${{ env.SERVER_PATH }}
             docker network create gamest-shared-network || true
             docker compose -f docker-compose.${{ env.DEPLOY_ENV }}.yml down
             docker compose -f docker-compose.${{ env.DEPLOY_ENV }}.yml up --detach --build --remove-orphans
-            cd supabase/docker
+            echo "Waiting for main stack to stabilize..."
+            
+            # Ожидаем, пока все контейнеры основного стека не перейдут в состояние Up
+            for i in {1..12}; do
+              if docker compose -f docker-compose.${{ env.DEPLOY_ENV }}.yml ps | grep "Up" | wc -l | grep -q "$(docker compose -f docker-compose.${{ env.DEPLOY_ENV }}.yml config --services | wc -l)"; then
+                echo "All containers in main stack are up!"
+                break
+              else
+                echo "Waiting for all containers to start... ($i/12)"
+                sleep 10
+              fi
+            done
+            
+            # Проверяем, все ли контейнеры запустились
+            if ! docker compose -f docker-compose.${{ env.DEPLOY_ENV }}.yml ps | grep "Up" | wc -l | grep -q "$(docker compose -f docker-compose.${{ env.DEPLOY_ENV }}.yml config --services | wc -l)"; then
+              echo "Error: Not all containers in main stack are up!"
+              docker compose -f docker-compose.${{ env.DEPLOY_ENV }}.yml ps
+              docker compose -f docker-compose.${{ env.DEPLOY_ENV }}.yml logs
+              exit 1
+            fi
+          EOF
+
+      - name: Deploy to server - Start Supabase stack
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -i deploy_key root@${{ env.SERVER_HOST }} << 'EOF'
+            cd ${{ env.SERVER_PATH }}/supabase/docker
             docker compose -f docker-compose.yml down
             docker compose -f docker-compose.yml up --detach --build --remove-orphans
+            echo "Waiting for Supabase stack to stabilize..."
+            
+            # Ожидаем, пока все контейнеры Supabase не перейдут в состояние Up
+            for i in {1..12}; do
+              if docker compose -f docker-compose.yml ps | grep "Up" | wc -l | grep -q "$(docker compose -f docker-compose.yml config --services | wc -l)"; then
+                echo "All containers in Supabase stack are up!"
+                break
+              else
+                echo "Waiting for all containers to start... ($i/12)"
+                sleep 10
+              fi
+            done
+            
+            # Проверяем, все ли контейнеры запустились
+            if ! docker compose -f docker-compose.yml ps | grep "Up" | wc -l | grep -q "$(docker compose -f docker-compose.yml config --services | wc -l)"; then
+              echo "Error: Not all containers in Supabase stack are up!"
+              docker compose -f docker-compose.yml ps
+              docker compose -f docker-compose.yml logs
+              exit 1
+            fi
           EOF
-          
+
+      - name: Clean up deploy key
+        run: |
           rm deploy_key
 
       - name: Notify deployment
