@@ -62,7 +62,7 @@ export const PhaserGame = forwardRef(function PhaserGame({ currentActiveScene },
         return null;
     }
 
-    return <div id="game-container"></div>;
+    return null; // #game-container уже есть в HTML, ничего рендерить не нужно
 });
 
 /**

@@ -1,95 +1,82 @@
 /**
- * Сцена с шестиугольной сеткой для Phaser.
- * Подключается к комнате Colyseus, отображает статус соединения и интегрируется с данными пользователя.
- * @module HexGridScene
+ * Класс для управления гексагональной сеткой в Phaser.
+ * Создаёт и отрисовывает гексы на карте.
+ * @module HexGrid
  */
 
-import Phaser from 'phaser';
-import { Client } from 'colyseus.js';
-import { EventBus } from '../EventBus';
-import { supabase } from '../../lib/supabase';
-
-/**
- * Класс сцены с шестиугольной сеткой.
- * @extends Phaser.Scene
- */
-export default class HexGrid extends Phaser.Scene {
+export class HexGrid {
     /**
-     * Создаёт экземпляр сцены HexGrid.
+     * Создаёт экземпляр гексагональной сетки.
+     * @param {Phaser.Scene} scene - Сцена Phaser, где отображаются гексы
      */
-    constructor() {
-        super('HexGrid');
-        /**
-         * Клиент Colyseus для подключения к серверу.
-         * @type {Client}
-         */
-        this.client = new Client('ws://localhost:2567');
-        /**
-         * Текст статуса подключения.
-         * @type {Phaser.GameObjects.Text|null}
-         */
-        this.statusText = null;
-        /**
-         * Комната Colyseus, к которой подключён клиент.
-         * @type {import('colyseus.js').Room|null}
-         */
-        this.room = null;
+    constructor(scene) {
+        this.scene = scene;
+        this.hexSize = 115;
+        this.hexes = [];
+        this.hexGroup = this.scene.add.group();
     }
 
     /**
-     * Инициализирует сцену, добавляет текст статуса и запускает подключение к комнате.
+     * Создаёт гексагональную сетку на основе заданных размеров.
      */
-    create() {
-        this.statusText = this.add.text(100, 100, 'Connecting to Colyseus...', { 
-            color: '#ffffff',
-            fontSize: '24px',
-            fontFamily: 'Arial'
-        });
-        this.time.delayedCall(100, this.connectToRoom, [], this);
-        EventBus.emit('current-scene-ready', this);
-    }
+    createGrid() {
+        const worldWidth = 2048;
+        const worldHeight = 2048;
+        const hexWidth = this.hexSize * Math.sqrt(3);
+        const hexHeight = this.hexSize * 2;
+        const cols = Math.ceil(worldWidth / (hexWidth * 0.75)) + 1;
+        const rows = Math.ceil(worldHeight / (hexHeight * 0.75)) + 1;
 
-    /**
-     * Подключает клиента к комнате Colyseus с использованием данных пользователя из Supabase.
-     * @async
-     */
-    async connectToRoom() {
-        try {
-            const { data: { user }, error: userError } = await supabase.auth.getUser();
-            if (userError || !user) {
-                throw new Error('No authenticated user found');
-            }
-
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-            if (sessionError || !session) {
-                throw new Error('No active session found');
-            }
-
-            const { data: profile, error: profileError } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .single();
-            if (profileError) {
-                throw new Error(profileError.message);
-            }
-
-            this.room = await this.client.joinOrCreate('hex', { 
-                hexId: 'hex_1',
-                userId: user.id,
-                username: profile.username,
-                token: session.access_token
-            });
-
-            if (this.scene.isActive()) {
-                this.statusText.setText('Connected to Colyseus');
-                console.log('Client connected to room:', this.room.id);
-            }
-        } catch (error) {
-            console.error('Failed to join room:', error.message);
-            if (this.scene.isActive()) {
-                this.statusText.setText(`Failed to connect: ${error.message}`);
+        for (let q = 0; q < cols; q++) {
+            for (let r = 0; r < rows; r++) {
+                const x = hexWidth * (q + r % 2 * 0.5);
+                const y = hexHeight * 0.75 * r;
+                if (this.isHexInsideBounds(x, y, worldWidth, worldHeight)) {
+                    this.addHex(q, r, x + 10, y + 60);
+                }
             }
         }
+    }
+
+    /**
+     * Проверяет, находится ли гекс в пределах карты.
+     * @param {number} x - Координата X центра гекса
+     * @param {number} y - Координата Y центра гекса
+     * @param {number} worldWidth - Ширина мира
+     * @param {number} worldHeight - Высота мира
+     * @returns {boolean} True, если гекс внутри границ
+     */
+    isHexInsideBounds(x, y, worldWidth, worldHeight) {
+        const hexHalfWidth = this.hexSize * Math.sqrt(3) / 2;
+        const hexHalfHeight = this.hexSize;
+        return (
+            x - hexHalfWidth >= 10 &&
+            x + hexHalfWidth <= worldWidth - 10 &&
+            y - hexHalfHeight >= 45 &&
+            y + hexHalfHeight <= worldHeight - 45
+        );
+    }
+
+    /**
+     * Добавляет гекс на карту.
+     * @param {number} q - Координата q в гексагональной системе
+     * @param {number} r - Координата r в гексагональной системе
+     * @param {number} x - Координата X в пикселях
+     * @param {number} y - Координата Y в пикселях
+     */
+    addHex(q, r, x, y) {
+        const type = 'closed';
+        const points = [
+            0, -this.hexSize,
+            this.hexSize * Math.sqrt(3) / 2, -this.hexSize / 2,
+            this.hexSize * Math.sqrt(3) / 2, this.hexSize / 2,
+            0, this.hexSize,
+            -this.hexSize * Math.sqrt(3) / 2, this.hexSize / 2,
+            -this.hexSize * Math.sqrt(3) / 2, -this.hexSize / 2
+        ];
+
+        const hex = this.scene.add.polygon(x, y, points, 0xaaaaaa, 0.7);
+        this.hexes.push({ q, r, x, y, type, closed: true, gameObject: hex });
+        this.hexGroup.add(hex);
     }
 }

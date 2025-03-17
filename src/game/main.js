@@ -5,7 +5,7 @@
  */
 
 import Phaser from "phaser";
-import HexGrid from "./scenes/HexGrid";
+import { Game } from "./scenes/Game";
 
 /**
  * Конфигурация игры Phaser.
@@ -18,10 +18,10 @@ const config = {
     scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
-        width: 800,
-        height: 600,
+        width: window.innerWidth - 20, // Учитываем border 10px с каждой стороны
+        height: window.innerHeight - 20,
     },
-    scene: [HexGrid],
+    scene: [Game],
 };
 
 /**

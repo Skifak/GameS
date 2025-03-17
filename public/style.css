@@ -31,20 +31,31 @@
     overflow: hidden;
     background-color: var(--black);
     height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
     font-family: Verdana, Arial, Helvetica, sans-serif;
-  }
-  
-  #game-container {
-    width: calc(100vw - 20px);
-    height: calc(100vh - 20px);
+    /* Убираем flex, так как #game-container теперь управляет позиционированием */
+}
+
+#game-container {
+    width: 100vw;
+    height: 100vh;
     border: 10px solid var(--armadillo);
     box-sizing: border-box;
     position: relative;
     overflow: hidden;
-  }
+}
+#root {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10; /* Интерфейс React поверх канваса */
+}
+#game-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain;
+}
   
   .interface {
     position: absolute;
@@ -197,7 +208,3 @@
     text-decoration: underline;
   }
   
-  #game-container canvas {
-    width: 100% !important;
-    height: 100% !important;
-  }
