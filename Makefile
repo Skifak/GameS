@@ -76,14 +76,8 @@ startdb:                  # Запускает Supabase через отдель�
 
 # Запуск приложения через Docker
 .PHONY: start              # Объявляем start как "phony"
-start:                     # Запускает приложение через Docker в зависимости от ENV
-ifeq ($(ENV),prod)
-	$(NPM) run start:prod
-else ifeq ($(ENV),stage)
-	$(NPM) run start:stage
-else
+start:                     # Запускает приложение через Docker
 	$(NPM) run start:dev
-endif
 
 # Остановка Docker-контейнеров
 .PHONY: stop               # Объявляем stop как "phony"

@@ -36,7 +36,9 @@ function App() {
         <div id="game-container">
             <div className="interface">
                 <div className="info-panel">
-                    <div className="location-name">Привет, {user.profile?.username || 'Игрок'}!</div>
+                    <div className="location-name">
+                        Привет, {user?.profile?.username || 'Игрок'}!
+                    </div>
                     <div className="tab-content-buttons">
                         <button className="profile-text">Профиль</button>
                         <button className="logout-text" onClick={signOut}>
@@ -46,7 +48,6 @@ function App() {
                 </div>
             </div>
             <PhaserGame ref={phaserRef} />
-            {/* Контейнер для отображения уведомлений */}
             <ToastContainer position="top-right" autoClose={3000} />
         </div>
     );

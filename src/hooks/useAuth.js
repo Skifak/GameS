@@ -47,11 +47,14 @@ export function useAuth() {
          * Обновляет состояние пользователя при входе, выходе или изменении сессии.
          */
         const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-            setUser(session?.user ? { ...session.user, profile: session.user.profile } : null);
+            if (event === 'SIGNED_OUT' || !session) {
+                setUser(null);
+            } else if (session?.user) {
+                setUser({ ...session.user, profile: session.user.profile });
+            }
             setLoading(false);
         });
 
-        // Очистка подписки при размонтировании компонента
         return () => authListener.subscription.unsubscribe();
     }, []);
 
@@ -69,6 +72,7 @@ export function useAuth() {
             const { user, profile } = await auth.signIn(email, password);
             logger.info(`Player ${profile.username} signed in`);
             setUser({ ...user, profile });
+            toast.success('Вход выполнен', { position: 'top-right', autoClose: 3000 });
             return { success: true, message: 'Вход выполнен' };
         } catch (error) {
             logger.error('Sign-in error:', error.message);
@@ -81,7 +85,7 @@ export function useAuth() {
 
     /**
      * Выполняет регистрацию пользователя через Supabase.
-     * После успеха показывает уведомление и через 3 секунды завершает сессию для перехода к форме входа.
+     * После успеха или ошибки завершает сессию, показывает уведомление и оставляет пользователя на форме входа.
      * @async
      * @param {string} email - Электронная почта пользователя
      * @param {string} password - Пароль пользователя
@@ -93,22 +97,17 @@ export function useAuth() {
             setLoading(true);
             const { profile } = await auth.signUp(email, password, username);
             logger.info(`Player ${username} registered`);
-
-            // Показываем уведомление об успешной регистрации
-            toast.success('Регистрация успешна! Перенаправляем на вход...', {
+            await supabase.auth.signOut(); // Явно вызываем signOut из Supabase
+            setUser(null);
+            toast.success('Регистрация успешна! Теперь вы можете войти', {
                 position: 'top-right',
                 autoClose: 3000,
             });
-
-            // Через 3 секунды завершаем сессию и сбрасываем состояние пользователя
-            setTimeout(async () => {
-                await auth.signOut();
-                setUser(null);
-            }, 3000);
-
             return { success: true, message: 'Регистрация успешна! Теперь вы можете войти' };
         } catch (error) {
             logger.error('Sign-up error:', error.message);
+            await supabase.auth.signOut();
+            setUser(null);
             toast.error(`Ошибка регистрации: ${error.message}`);
             return { success: false, message: error.message };
         } finally {

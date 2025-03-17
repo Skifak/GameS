@@ -5,9 +5,9 @@
  */
 
 import Phaser from 'phaser';
-import { Client } from 'colyseus.js'; // Явный импорт клиента Colyseus
+import { Client } from 'colyseus.js';
 import { EventBus } from '../EventBus';
-import { auth } from '../../lib/supabase'; // Импорт для получения текущего пользователя
+import { supabase } from '../../lib/supabase';
 
 /**
  * Класс сцены с шестиугольной сеткой.
@@ -20,9 +20,9 @@ export default class HexGrid extends Phaser.Scene {
      */
     constructor() {
         super('HexGrid');
-        this.client = new Client('ws://localhost:2567'); // Инициализация клиента Colyseus с правильным URL
-        this.statusText = null; // Текст статуса подключения
-        this.room = null; // Ссылка на комнату Colyseus
+        this.client = new Client('ws://localhost:2567');
+        this.statusText = null;
+        this.room = null;
     }
 
     /**
@@ -35,32 +35,36 @@ export default class HexGrid extends Phaser.Scene {
             fontSize: '24px',
             fontFamily: 'Arial'
         });
-        this.time.delayedCall(100, this.connectToRoom, [], this); // Отложенное подключение через 100 мс
-        EventBus.emit('current-scene-ready', this); // Уведомление о готовности сцены
+        this.time.delayedCall(100, this.connectToRoom, [], this);
+        EventBus.emit('current-scene-ready', this);
     }
 
     /**
      * Подключается к комнате Colyseus с именем "hex".
-     * Использует данные текущего пользователя из Supabase для передачи в комнату.
+     * Использует данные текущего пользователя и токен сессии из Supabase для аутентификации.
      * Обновляет текст статуса в зависимости от результата подключения.
      * @async
      */
     async connectToRoom() {
         try {
-            // Получаем текущего пользователя из Supabase
-            const currentUser = await auth.getCurrentUser();
-            if (!currentUser) {
+            const user = this.game.config.user;
+            if (!user) {
                 throw new Error('No authenticated user found');
             }
 
-            // Подключаемся к комнате Colyseus, передавая ID и имя пользователя
+            const { data: { session }, error } = await supabase.auth.getSession();
+            if (error || !session) {
+                throw new Error('No active session found');
+            }
+
             this.room = await this.client.joinOrCreate('hex', { 
                 hexId: 'hex_1',
-                userId: currentUser.id,
-                username: currentUser.profile.username
+                userId: user.id,
+                username: user.profile.username,
+                token: session.access_token
             });
 
-            if (this.scene.isActive()) { // Проверяем, активна ли сцена
+            if (this.scene.isActive()) {
                 this.statusText.setText('Connected to Colyseus');
                 console.log('Client connected to room:', this.room.id);
             }

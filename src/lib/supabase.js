@@ -62,26 +62,57 @@ export const auth = {
     },
 
     /**
-     * Выполняет вход пользователя в Supabase и обновляет профиль.
+     * Выполняет вход пользователя в Supabase и обновляет или создаёт профиль.
      * @async
      * @param {string} email - Электронная почта пользователя
      * @param {string} password - Пароль пользователя
      * @returns {Promise<{user: object, profile: object, session: object}>} Объект с данными пользователя, профиля и сессии
-     * @throws {Error} Если вход или обновление профиля не удались
+     * @throws {Error} Если вход или работа с профилем не удались
      */
     async signIn(email, password) {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw new Error(error.message);
 
+        // Проверяем, существует ли профиль
         const { data: profileData, error: profileError } = await supabase
             .from('profiles')
-            .update({ last_login: new Date().toISOString(), status: 'online' })
+            .select('*')
             .eq('id', data.user.id)
-            .select()
             .single();
 
-        if (profileError) throw new Error(profileError.message);
-        return { user: data.user, profile: profileData, session: data.session };
+        let profile;
+        if (profileError && profileError.code === 'PGRST116') {
+            // Если профиля нет (PGRST116 - no rows returned), создаём новый
+            const { data: newProfile, error: insertError } = await supabase
+                .from('profiles')
+                .insert({
+                    id: data.user.id,
+                    username: email.split('@')[0], // Используем часть email как временное имя
+                    email,
+                    role: 'player',
+                    created_at: new Date().toISOString(),
+                    last_login: new Date().toISOString(),
+                    status: 'online',
+                })
+                .select()
+                .single();
+            if (insertError) throw new Error(insertError.message);
+            profile = newProfile;
+        } else if (profileError) {
+            throw new Error(profileError.message);
+        } else {
+            // Если профиль есть, обновляем last_login и status
+            const { data: updatedProfile, error: updateError } = await supabase
+                .from('profiles')
+                .update({ last_login: new Date().toISOString(), status: 'online' })
+                .eq('id', data.user.id)
+                .select()
+                .single();
+            if (updateError) throw new Error(updateError.message);
+            profile = updatedProfile;
+        }
+
+        return { user: data.user, profile, session: data.session };
     },
 
     /**

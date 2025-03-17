@@ -13,7 +13,7 @@ import HexGrid from "./scenes/HexGrid";
  */
 const config = {
     type: Phaser.AUTO,
-    parent: "game-content",
+    parent: "game-container",
     backgroundColor: "#000000",
     scale: {
         mode: Phaser.Scale.FIT,
@@ -25,10 +25,11 @@ const config = {
 };
 
 /**
- * Запускает игру Phaser с заданным родительским элементом.
+ * Запускает игру Phaser с заданным родительским элементом и данными пользователя.
  * @param {string} parent - ID родительского HTML-элемента
+ * @param {Object} user - Данные текущего пользователя
  * @returns {Phaser.Game} Экземпляр игры Phaser
  */
-export default function StartGame(parent) {
-    return new Phaser.Game({ ...config, parent });
+export default function StartGame(parent, user) {
+    return new Phaser.Game({ ...config, parent, user });
 }
