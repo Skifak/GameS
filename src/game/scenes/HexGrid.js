@@ -11,7 +11,7 @@ export class HexGrid {
      */
     constructor(scene) {
         this.scene = scene;
-        this.hexSize = 115;
+        this.hexSize = 117;
         this.hexes = [];
         this.hexGroup = this.scene.add.group();
     }
@@ -32,7 +32,7 @@ export class HexGrid {
                 const x = hexWidth * (q + r % 2 * 0.5);
                 const y = hexHeight * 0.75 * r;
                 if (this.isHexInsideBounds(x, y, worldWidth, worldHeight)) {
-                    this.addHex(q, r, x + 10, y + 60);
+                    this.addHex(q, r, x + 10, y + 45);
                 }
             }
         }
@@ -65,7 +65,13 @@ export class HexGrid {
      * @param {number} y - Координата Y в пикселях
      */
     addHex(q, r, x, y) {
-        const type = 'closed';
+        const colors = {
+            neutral: 0xaaaaaa,
+            free: 0x00ff00,
+            danger: 0xff0000,
+            controlled: 0x0000ff
+        };
+        const type = 'neutral'; // Пока статично, позже можно получать из сервера
         const points = [
             0, -this.hexSize,
             this.hexSize * Math.sqrt(3) / 2, -this.hexSize / 2,
@@ -75,8 +81,24 @@ export class HexGrid {
             -this.hexSize * Math.sqrt(3) / 2, -this.hexSize / 2
         ];
 
-        const hex = this.scene.add.polygon(x, y, points, 0xaaaaaa, 0.7);
-        this.hexes.push({ q, r, x, y, type, closed: true, gameObject: hex });
+        const hex = this.scene.add.polygon(x, y, points, colors[type], 0.7);
+        hex.setInteractive(); // Делаем гекс интерактивным
+        this.hexes.push({ q, r, x, y, type, pointsOfInterest: [], gameObject: hex });
         this.hexGroup.add(hex);
+    }
+
+    /**
+     * Находит гекс по координатам игрока.
+     * @param {number} playerX - Координата X игрока
+     * @param {number} playerY - Координата Y игрока
+     * @returns {Object|null} Найденный гекс или null
+     */
+    findHexAt(playerX, playerY) {
+        return this.hexes.find(hex => {
+            const dx = playerX - hex.x;
+            const dy = playerY - hex.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            return distance < this.hexSize;
+        }) || null;
     }
 }

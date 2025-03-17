@@ -10,14 +10,7 @@ import { Client } from 'colyseus.js';
 import { supabase } from '../../lib/supabase';
 import { HexGrid } from './HexGrid';
 
-/**
- * Класс сцены основной игры.
- * @extends Scene
- */
 export class Game extends Scene {
-    /**
-     * Создаёт экземпляр сцены игры.
-     */
     constructor() {
         super('Game');
         this.client = new Client('ws://localhost:2567');
@@ -25,6 +18,7 @@ export class Game extends Scene {
         this.room = null;
         this.hexGrid = null;
         this.player = null;
+        this.pointsOfInterest = []; // Хранит графические объекты точек интереса
     }
 
     preload() {
@@ -57,7 +51,7 @@ export class Game extends Scene {
         // Настройка камеры
         this.cameras.main.setBounds(0, 0, 2048, 2048);
         this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-        this.cameras.main.setZoom(2); // Начальный масштаб 2x
+        this.cameras.main.setZoom(0.5); // Начальный масштаб 2x
 
         // Масштабирование через колесо мыши
         this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY) => {
@@ -70,8 +64,9 @@ export class Game extends Scene {
             color: '#ffffff', fontSize: '24px', fontFamily: 'Arial' 
         }).setScrollFactor(0).setDepth(10);
 
-        // Подключение к Colyseus
+        // Подключение к Colyseus и загрузка точек интереса
         this.time.delayedCall(100, this.connectToRoom, [], this);
+        this.time.delayedCall(200, this.loadPointsOfInterest, [], this);
         EventBus.emit('current-scene-ready', this);
     }
 
@@ -106,6 +101,66 @@ export class Game extends Scene {
             if (this.scene.isActive()) {
                 this.statusText.setText(`Failed to connect: ${error.message}`);
             }
+        }
+    }
+
+    async loadPointsOfInterest() {
+        try {
+            // Находим текущий гекс игрока
+            const currentHex = this.hexGrid.findHexAt(this.player.x, this.player.y);
+            if (!currentHex) {
+                console.warn('Player is not in any hex');
+                return;
+            }
+
+            // Очищаем предыдущие точки интереса
+            this.pointsOfInterest.forEach(point => point.destroy());
+            this.pointsOfInterest = [];
+
+            // Запрашиваем точки интереса для текущего гекса из Supabase
+            const { data, error } = await supabase
+                .from('points_of_interest')
+                .select('*')
+                .eq('hex_q', currentHex.q)
+                .eq('hex_r', currentHex.r);
+
+            if (error) throw new Error(error.message);
+            if (!data || data.length === 0) {
+                this.statusText.setText('No points of interest in this hex');
+                return;
+            }
+
+            // Отображаем точки интереса как прозрачные круги
+            const typeColors = {
+                camp: 0x4B712E,      // --green
+                transition: 0xffcf5b, // --orange
+                normal: 0xaaaaaa,     // --silver-chalice
+                anomaly: 0xff0000,    // красный
+                faction: 0x0000ff     // синий
+            };
+
+            data.forEach(point => {
+                const x = currentHex.x + point.x_offset;
+                const y = currentHex.y + point.y_offset;
+                const color = typeColors[point.type] || 0xaaaaaa;
+                const circle = this.add.circle(x, y, 10, color, 0.7).setDepth(2);
+                this.pointsOfInterest.push(circle);
+            });
+
+            this.statusText.setText(`Points of interest loaded: ${data.length}`);
+            currentHex.pointsOfInterest = data; // Сохраняем данные в гексе
+        } catch (error) {
+            console.error('Failed to load points of interest:', error.message);
+            this.statusText.setText(`Error: ${error.message}`);
+        }
+    }
+
+    update() {
+        // Проверяем, изменился ли гекс игрока, и обновляем точки интереса
+        const currentHex = this.hexGrid.findHexAt(this.player.x, this.player.y);
+        if (currentHex && (!this.lastHex || this.lastHex.q !== currentHex.q || this.lastHex.r !== currentHex.r)) {
+            this.loadPointsOfInterest();
+            this.lastHex = currentHex;
         }
     }
 
