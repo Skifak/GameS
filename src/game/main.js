@@ -25,11 +25,10 @@ const config = {
 };
 
 /**
- * Запускает игру Phaser с заданным родительским элементом и данными пользователя.
+ * Запускает игру Phaser с заданным родительским элементом.
  * @param {string} parent - ID родительского HTML-элемента
- * @param {Object} user - Данные текущего пользователя
  * @returns {Phaser.Game} Экземпляр игры Phaser
  */
-export default function StartGame(parent, user) {
-    return new Phaser.Game({ ...config, parent, user });
+export default function StartGame(parent) {
+    return new Phaser.Game({ ...config, parent });
 }

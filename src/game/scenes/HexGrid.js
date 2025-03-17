@@ -14,10 +14,6 @@ import { supabase } from '../../lib/supabase';
  * @extends Phaser.Scene
  */
 export default class HexGrid extends Phaser.Scene {
-    /**
-     * Создаёт экземпляр сцены HexGrid.
-     * Инициализирует клиент Colyseus с указанием URL сервера.
-     */
     constructor() {
         super('HexGrid');
         this.client = new Client('ws://localhost:2567');
@@ -25,10 +21,6 @@ export default class HexGrid extends Phaser.Scene {
         this.room = null;
     }
 
-    /**
-     * Инициализирует сцену, отображая текст статуса и подключаясь к комнате Colyseus.
-     * Вызывает событие готовности сцены через EventBus.
-     */
     create() {
         this.statusText = this.add.text(100, 100, 'Connecting to Colyseus...', { 
             color: '#ffffff',
@@ -39,28 +31,31 @@ export default class HexGrid extends Phaser.Scene {
         EventBus.emit('current-scene-ready', this);
     }
 
-    /**
-     * Подключается к комнате Colyseus с именем "hex".
-     * Использует данные текущего пользователя и токен сессии из Supabase для аутентификации.
-     * Обновляет текст статуса в зависимости от результата подключения.
-     * @async
-     */
     async connectToRoom() {
         try {
-            const user = this.game.config.user;
-            if (!user) {
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            if (userError || !user) {
                 throw new Error('No authenticated user found');
             }
 
-            const { data: { session }, error } = await supabase.auth.getSession();
-            if (error || !session) {
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError || !session) {
                 throw new Error('No active session found');
+            }
+
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+            if (profileError) {
+                throw new Error(profileError.message);
             }
 
             this.room = await this.client.joinOrCreate('hex', { 
                 hexId: 'hex_1',
                 userId: user.id,
-                username: user.profile.username,
+                username: profile.username,
                 token: session.access_token
             });
 

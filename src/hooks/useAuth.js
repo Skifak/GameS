@@ -25,11 +25,6 @@ export function useAuth() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        /**
-         * Проверяет наличие текущего пользователя при монтировании компонента.
-         * Устанавливает начальное состояние пользователя.
-         * @async
-         */
         const fetchUser = async () => {
             try {
                 const currentUser = await auth.getCurrentUser();
@@ -42,10 +37,6 @@ export function useAuth() {
         };
         fetchUser();
 
-        /**
-         * Подписка на изменения состояния аутентификации через Supabase.
-         * Обновляет состояние пользователя при входе, выходе или изменении сессии.
-         */
         const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
             if (event === 'SIGNED_OUT' || !session) {
                 setUser(null);
@@ -58,22 +49,15 @@ export function useAuth() {
         return () => authListener.subscription.unsubscribe();
     }, []);
 
-    /**
-     * Выполняет вход пользователя через Supabase.
-     * Устанавливает данные пользователя в состояние при успехе.
-     * @async
-     * @param {string} email - Электронная почта пользователя
-     * @param {string} password - Пароль пользователя
-     * @returns {Promise<{success: boolean, message: string}>} Результат операции (успех или ошибка)
-     */
     const signIn = async (email, password) => {
         try {
             setLoading(true);
-            const { user, profile } = await auth.signIn(email, password);
+            const { user: signedInUser, profile } = await auth.signIn(email, password);
+            const updatedUser = { ...signedInUser, profile };
+            setUser(updatedUser); // Синхронно обновляем user
             logger.info(`Player ${profile.username} signed in`);
-            setUser({ ...user, profile });
             toast.success('Вход выполнен', { position: 'top-right', autoClose: 3000 });
-            return { success: true, message: 'Вход выполнен' };
+            return { success: true, message: 'Вход выполнен', user: updatedUser };
         } catch (error) {
             logger.error('Sign-in error:', error.message);
             toast.error(`Ошибка входа: ${error.message}`);
@@ -83,21 +67,12 @@ export function useAuth() {
         }
     };
 
-    /**
-     * Выполняет регистрацию пользователя через Supabase.
-     * После успеха или ошибки завершает сессию, показывает уведомление и оставляет пользователя на форме входа.
-     * @async
-     * @param {string} email - Электронная почта пользователя
-     * @param {string} password - Пароль пользователя
-     * @param {string} username - Имя пользователя (3-20 символов, только буквы и цифры)
-     * @returns {Promise<{success: boolean, message: string}>} Результат операции (успех или ошибка)
-     */
     const signUp = async (email, password, username) => {
         try {
             setLoading(true);
             const { profile } = await auth.signUp(email, password, username);
             logger.info(`Player ${username} registered`);
-            await supabase.auth.signOut(); // Явно вызываем signOut из Supabase
+            await supabase.auth.signOut();
             setUser(null);
             toast.success('Регистрация успешна! Теперь вы можете войти', {
                 position: 'top-right',
@@ -115,12 +90,6 @@ export function useAuth() {
         }
     };
 
-    /**
-     * Выполняет выход пользователя из Supabase.
-     * Сбрасывает состояние пользователя при успехе.
-     * @async
-     * @returns {Promise<{success: boolean, message: string}>} Результат операции (успех или ошибка)
-     */
     const signOut = async () => {
         try {
             setLoading(true);

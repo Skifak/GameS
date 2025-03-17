@@ -19,11 +19,11 @@ import { useAuth } from '../hooks/useAuth';
  */
 export const PhaserGame = forwardRef(function PhaserGame({ currentActiveScene }, ref) {
     const game = useRef(null);
-    const { user, loading } = useAuth();
+    const { loading } = useAuth();
 
     useLayoutEffect(() => {
-        if (!loading && user && !game.current) {
-            game.current = StartGame("game-container", user);
+        if (!loading && !game.current) {
+            game.current = StartGame("game-container");
             if (ref !== null) {
                 ref.current = { game: game.current, scene: null };
             }
@@ -35,7 +35,7 @@ export const PhaserGame = forwardRef(function PhaserGame({ currentActiveScene },
                 game.current = null;
             }
         };
-    }, [ref, user, loading]);
+    }, [ref, loading]);
 
     useEffect(() => {
         EventBus.on('current-scene-ready', (currentScene) => {
@@ -52,17 +52,13 @@ export const PhaserGame = forwardRef(function PhaserGame({ currentActiveScene },
         };
     }, [currentActiveScene, ref]);
 
-    if (loading || !user) {
-        return null; // Не рендерим игру, пока user не загружен
+    if (loading) {
+        return null;
     }
 
     return <div id="game-container"></div>;
 });
 
 PhaserGame.propTypes = {
-    /**
-     * Функция для обработки текущей активной сцены.
-     * @type {Function}
-     */
     currentActiveScene: PropTypes.func
 };
