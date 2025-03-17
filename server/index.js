@@ -13,6 +13,8 @@ import http from "http";
 import dotenv from "dotenv";
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import cors from "cors";
+import adminRouter from './admin.js'; // Новый роутер для администрирования
+import { PointRoom } from './pointRoom.js';
 
 import logger from "./logger.js";
 import config from "./config.js";
@@ -62,6 +64,7 @@ const app = express();
 
 app.use(cors(config.cors));
 app.use(express.json());
+app.use('/admin', adminRouter); // Подключаем API администрирования
 
 /**
  * Middleware для проверки JWT-токена в запросах.
@@ -191,6 +194,7 @@ class HexRoom extends Room {
 (async () => {
     await initRedis();
     gameServer.define("hex", HexRoom);
+    gameServer.define("point", PointRoom); // Определяем новую комнату для точек
     app.use("/colyseus", monitor());
     server.listen(config.port, () => logger.info(`Game server running on port ${config.port}`));
 })();

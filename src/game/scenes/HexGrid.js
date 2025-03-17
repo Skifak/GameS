@@ -1,77 +1,94 @@
 /**
  * Класс для управления гексагональной сеткой в Phaser.
- * Создаёт и отрисовывает гексы на карте.
+ * Отвечает за отрисовку гексов и точек интереса на основе данных с сервера.
  * @module HexGrid
  */
 
+import Phaser from 'phaser';
+
+/**
+ * Класс гексагональной сетки.
+ */
 export class HexGrid {
     /**
-     * Создаёт экземпляр гексагональной сетки.
-     * @param {Phaser.Scene} scene - Сцена Phaser, где отображаются гексы
+     * Создает экземпляр гексагональной сетки.
+     * @param {Phaser.Scene} scene - Сцена Phaser, в которой отображается сетка
+     * @param {import('colyseus.js').Room} room - Комната Colyseus для получения данных с сервера
      */
-    constructor(scene) {
+    constructor(scene, room) {
         this.scene = scene;
-        this.hexSize = 117;
-        this.hexes = [];
-        this.hexGroup = this.scene.add.group();
+        this.room = room; // Комната Colyseus для синхронизации
+        this.hexSize = 117; // Размер гекса (радиус)
+        this.hexGroup = this.scene.add.group(); // Группа для гексов
+        this.pointsGroup = this.scene.add.group(); // Группа для точек интереса
     }
 
     /**
-     * Создаёт гексагональную сетку на основе заданных размеров.
+     * Инициализирует сетку, запрашивая данные о гексах и точках с сервера.
+     * @async
      */
-    createGrid() {
-        const worldWidth = 2048;
-        const worldHeight = 2048;
-        const hexWidth = this.hexSize * Math.sqrt(3);
-        const hexHeight = this.hexSize * 2;
-        const cols = Math.ceil(worldWidth / (hexWidth * 0.75)) + 1;
-        const rows = Math.ceil(worldHeight / (hexHeight * 0.75)) + 1;
+    async initGrid() {
+        await this.loadHexes();
+        await this.loadPoints();
+        this.setupListeners();
+    }
 
-        for (let q = 0; q < cols; q++) {
-            for (let r = 0; r < rows; r++) {
-                const x = hexWidth * (q + r % 2 * 0.5);
-                const y = hexHeight * 0.75 * r;
-                if (this.isHexInsideBounds(x, y, worldWidth, worldHeight)) {
-                    this.addHex(q, r, x + 10, y + 45);
-                }
-            }
+    /**
+     * Загружает данные о гексах с сервера и отрисовывает их.
+     * @async
+     */
+    async loadHexes() {
+        try {
+            // Предполагаем, что сервер отправляет список гексов через API или Colyseus
+            const { data, error } = await this.scene.supabase
+                .from('hexes')
+                .select('q, r, type');
+            if (error) throw new Error(error.message);
+
+            data.forEach(hex => this.drawHex(hex.q, hex.r, hex.type));
+            this.hexGroup.getChildren().forEach(hex => hex.setDepth(1));
+        } catch (error) {
+            console.error('Failed to load hexes:', error.message);
         }
     }
 
     /**
-     * Проверяет, находится ли гекс в пределах карты.
-     * @param {number} x - Координата X центра гекса
-     * @param {number} y - Координата Y центра гекса
-     * @param {number} worldWidth - Ширина мира
-     * @param {number} worldHeight - Высота мира
-     * @returns {boolean} True, если гекс внутри границ
+     * Загружает данные о точках интереса с сервера и отрисовывает их.
+     * @async
      */
-    isHexInsideBounds(x, y, worldWidth, worldHeight) {
-        const hexHalfWidth = this.hexSize * Math.sqrt(3) / 2;
-        const hexHalfHeight = this.hexSize;
-        return (
-            x - hexHalfWidth >= 10 &&
-            x + hexHalfWidth <= worldWidth - 10 &&
-            y - hexHalfHeight >= 45 &&
-            y + hexHalfHeight <= worldHeight - 45
-        );
+    async loadPoints() {
+        try {
+            const { data, error } = await this.scene.supabase
+                .from('points_of_interest')
+                .select('id, hex_q, hex_r, type, x, y');
+            if (error) throw new Error(error.message);
+
+            data.forEach(point => this.drawPoint(point));
+            this.pointsGroup.getChildren().forEach(point => point.setDepth(2));
+        } catch (error) {
+            console.error('Failed to load points:', error.message);
+        }
     }
 
     /**
-     * Добавляет гекс на карту.
+     * Отрисовывает один гекс на карте.
      * @param {number} q - Координата q в гексагональной системе
      * @param {number} r - Координата r в гексагональной системе
-     * @param {number} x - Координата X в пикселях
-     * @param {number} y - Координата Y в пикселях
+     * @param {string} type - Тип гекса (neutral, free, danger, controlled)
      */
-    addHex(q, r, x, y) {
+    drawHex(q, r, type) {
+        const hexWidth = this.hexSize * Math.sqrt(3);
+        const hexHeight = this.hexSize * 2;
+        const x = hexWidth * (q + (r % 2) * 0.5) + 10; // Смещение для выравнивания
+        const y = hexHeight * 0.75 * r + 45;
+
         const colors = {
             neutral: 0xaaaaaa,
             free: 0x00ff00,
             danger: 0xff0000,
             controlled: 0x0000ff
         };
-        const type = 'neutral'; // Пока статично, позже можно получать из сервера
+
         const points = [
             0, -this.hexSize,
             this.hexSize * Math.sqrt(3) / 2, -this.hexSize / 2,
@@ -81,24 +98,99 @@ export class HexGrid {
             -this.hexSize * Math.sqrt(3) / 2, -this.hexSize / 2
         ];
 
-        const hex = this.scene.add.polygon(x, y, points, colors[type], 0.7);
-        hex.setInteractive(); // Делаем гекс интерактивным
-        this.hexes.push({ q, r, x, y, type, pointsOfInterest: [], gameObject: hex });
+        const hex = this.scene.add.polygon(x, y, points, colors[type] || 0xaaaaaa, 0.7);
+        hex.setData({ q, r, type }); // Сохраняем данные для идентификации
         this.hexGroup.add(hex);
     }
 
     /**
-     * Находит гекс по координатам игрока.
-     * @param {number} playerX - Координата X игрока
-     * @param {number} playerY - Координата Y игрока
-     * @returns {Object|null} Найденный гекс или null
+     * Отрисовывает одну точку интереса на карте.
+     * @param {Object} point - Данные точки интереса
+     * @param {number} point.id - Уникальный ID точки
+     * @param {number} point.hex_q - Координата q гекса
+     * @param {number} point.hex_r - Координата r гекса
+     * @param {string} point.type - Тип точки (camp, transition, normal, anomaly, faction)
+     * @param {number} point.x - Координата X на карте
+     * @param {number} point.y - Координата Y на карте
      */
-    findHexAt(playerX, playerY) {
-        return this.hexes.find(hex => {
-            const dx = playerX - hex.x;
-            const dy = playerY - hex.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            return distance < this.hexSize;
-        }) || null;
+    drawPoint(point) {
+        const typeColors = {
+            camp: 0x4B712E,      // --green
+            transition: 0xffcf5b, // --orange
+            normal: 0xaaaaaa,     // --silver-chalice
+            anomaly: 0xff0000,    // красный
+            faction: 0x0000ff     // синий
+        };
+
+        const circle = this.scene.add.circle(point.x, point.y, 10, typeColors[point.type] || 0xaaaaaa, 0.7);
+        circle.setInteractive(); // Делаем точку кликабельной
+        circle.on('pointerdown', () => this.handlePointClick(point.id));
+        circle.setData({ id: point.id, type: point.type, hex_q: point.hex_q, hex_r: point.hex_r });
+        this.pointsGroup.add(circle);
+    }
+
+    /**
+     * Обрабатывает клик по точке интереса и отправляет запрос на сервер.
+     * @param {number} pointId - ID точки интереса
+     */
+    handlePointClick(pointId) {
+        if (this.room) {
+            this.room.send({ type: 'moveToPoint', pointId });
+            console.log(`Requested move to point ${pointId}`);
+        }
+    }
+
+    /**
+     * Настраивает слушатели событий от сервера для динамического обновления.
+     */
+    setupListeners() {
+        if (!this.room) return;
+
+        // Обновление позиции игрока
+        this.room.onMessage('playerMoved', (data) => {
+            console.log(`Player ${data.playerId} moved to (${data.x}, ${data.y})`);
+            // Логика обновления маркера игрока будет в Game.js
+        });
+
+        // Обновление точек интереса (например, при добавлении новой точки админом)
+        this.room.onMessage('pointAdded', (point) => {
+            this.drawPoint(point);
+        });
+
+        // Обновление гексов (например, при изменении типа админом)
+        this.room.onMessage('hexUpdated', (hex) => {
+            const existingHex = this.hexGroup.getChildren().find(h => 
+                h.getData('q') === hex.q && h.getData('r') === hex.r
+            );
+            if (existingHex) {
+                existingHex.fillColor = this.getHexColor(hex.type);
+                existingHex.setData('type', hex.type);
+            } else {
+                this.drawHex(hex.q, hex.r, hex.type);
+            }
+        });
+    }
+
+    /**
+     * Возвращает цвет для гекса в зависимости от его типа.
+     * @param {string} type - Тип гекса
+     * @returns {number} Код цвета в формате Phaser
+     */
+    getHexColor(type) {
+        const colors = {
+            neutral: 0xaaaaaa,
+            free: 0x00ff00,
+            danger: 0xff0000,
+            controlled: 0x0000ff
+        };
+        return colors[type] || 0xaaaaaa;
+    }
+
+    /**
+     * Очищает сетку (например, при выходе из сцены).
+     */
+    clearGrid() {
+        this.hexGroup.clear(true, true);
+        this.pointsGroup.clear(true, true);
     }
 }

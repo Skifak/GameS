@@ -1,6 +1,6 @@
 /**
  * Сцена игры для Phaser.
- * Отображает карту с гексагональной сеткой, подключается к Colyseus и управляет камерой.
+ * Отображает карту с гексагональной сеткой, подключается к Colyseus и управляет перемещением игрока.
  * @module GameScene
  */
 
@@ -10,6 +10,10 @@ import { Client } from 'colyseus.js';
 import { supabase } from '../../lib/supabase';
 import { HexGrid } from './HexGrid';
 
+/**
+ * Класс сцены игры.
+ * @extends Scene
+ */
 export class Game extends Scene {
     constructor() {
         super('Game');
@@ -18,13 +22,19 @@ export class Game extends Scene {
         this.room = null;
         this.hexGrid = null;
         this.player = null;
-        this.pointsOfInterest = []; // Хранит графические объекты точек интереса
+        this.supabase = supabase; // Подключаем Supabase в сцену
     }
 
+    /**
+     * Загружает необходимые ресурсы.
+     */
     preload() {
         this.load.image('fon', 'assets/fon.jpg');
     }
 
+    /**
+     * Создает сцену игры.
+     */
     create() {
         // Фон
         let background;
@@ -40,13 +50,12 @@ export class Game extends Scene {
             console.warn('Background image "fon.jpg" not found, using gray background');
         }
 
-        // Создание гексагональной сетки
-        this.hexGrid = new HexGrid(this);
-        this.hexGrid.createGrid();
-        this.hexGrid.hexGroup.getChildren().forEach(hex => hex.setDepth(1));
+        // Инициализация гексагональной сетки
+        this.hexGrid = new HexGrid(this, this.room);
+        this.hexGrid.initGrid(); // Асинхронная загрузка гексов и точек
 
-        // Маркер игрока в центре карты
-        this.player = this.add.circle(1024, 1024, 5, 0xffcf5b).setDepth(2);
+        // Маркер игрока
+        this.player = this.add.circle(1024, 1024, 5, 0xffcf5b).setDepth(2); // Начальная позиция в центре
 
         // Настройка камеры
         this.cameras.main.setBounds(0, 0, 2048, 2048);
@@ -60,33 +69,39 @@ export class Game extends Scene {
         });
 
         // Текст статуса
-        this.statusText = this.add.text(10, 10, 'Connecting to Colyseus...', { 
-            color: '#ffffff', fontSize: '24px', fontFamily: 'Arial' 
+        this.statusText = this.add.text(10, 10, 'Connecting to Colyseus...', {
+            color: '#ffffff',
+            fontSize: '24px',
+            fontFamily: 'Arial'
         }).setScrollFactor(0).setDepth(10);
 
-        // Подключение к Colyseus и загрузка точек интереса
+        // Подключение к Colyseus
         this.time.delayedCall(100, this.connectToRoom, [], this);
-        this.time.delayedCall(200, this.loadPointsOfInterest, [], this);
         EventBus.emit('current-scene-ready', this);
     }
 
+    /**
+     * Подключается к комнате Colyseus для управления точкой интереса.
+     * @async
+     */
     async connectToRoom() {
         try {
-            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            const { data: { user }, error: userError } = await this.supabase.auth.getUser();
             if (userError || !user) throw new Error('No authenticated user found');
 
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            const { data: { session }, error: sessionError } = await this.supabase.auth.getSession();
             if (sessionError || !session) throw new Error('No active session found');
 
-            const { data: profile, error: profileError } = await supabase
+            const { data: profile, error: profileError } = await this.supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', user.id)
                 .single();
             if (profileError) throw new Error(profileError.message);
 
-            this.room = await this.client.joinOrCreate('hex', { 
-                hexId: 'hex_1',
+            // Подключаемся к комнате первой точки интереса (для теста — точка с ID 1)
+            this.room = await this.client.joinOrCreate('point', {
+                pointId: 1, // Тестовая точка, позже будет динамически
                 userId: user.id,
                 username: profile.username,
                 token: session.access_token
@@ -95,6 +110,14 @@ export class Game extends Scene {
             if (this.scene.isActive()) {
                 this.statusText.setText('Connected to Colyseus');
                 console.log('Client connected to room:', this.room.id);
+
+                // Обновляем позицию игрока на основе данных из комнаты
+                this.room.onStateChange((state) => {
+                    const playerData = state.players[this.room.sessionId];
+                    if (playerData) {
+                        this.player.setPosition(playerData.x, playerData.y);
+                    }
+                });
             }
         } catch (error) {
             console.error('Failed to join room:', error.message);
@@ -104,66 +127,16 @@ export class Game extends Scene {
         }
     }
 
-    async loadPointsOfInterest() {
-        try {
-            // Находим текущий гекс игрока
-            const currentHex = this.hexGrid.findHexAt(this.player.x, this.player.y);
-            if (!currentHex) {
-                console.warn('Player is not in any hex');
-                return;
-            }
-
-            // Очищаем предыдущие точки интереса
-            this.pointsOfInterest.forEach(point => point.destroy());
-            this.pointsOfInterest = [];
-
-            // Запрашиваем точки интереса для текущего гекса из Supabase
-            const { data, error } = await supabase
-                .from('points_of_interest')
-                .select('*')
-                .eq('hex_q', currentHex.q)
-                .eq('hex_r', currentHex.r);
-
-            if (error) throw new Error(error.message);
-            if (!data || data.length === 0) {
-                this.statusText.setText('No points of interest in this hex');
-                return;
-            }
-
-            // Отображаем точки интереса как прозрачные круги
-            const typeColors = {
-                camp: 0x4B712E,      // --green
-                transition: 0xffcf5b, // --orange
-                normal: 0xaaaaaa,     // --silver-chalice
-                anomaly: 0xff0000,    // красный
-                faction: 0x0000ff     // синий
-            };
-
-            data.forEach(point => {
-                const x = currentHex.x + point.x_offset;
-                const y = currentHex.y + point.y_offset;
-                const color = typeColors[point.type] || 0xaaaaaa;
-                const circle = this.add.circle(x, y, 10, color, 0.7).setDepth(2);
-                this.pointsOfInterest.push(circle);
-            });
-
-            this.statusText.setText(`Points of interest loaded: ${data.length}`);
-            currentHex.pointsOfInterest = data; // Сохраняем данные в гексе
-        } catch (error) {
-            console.error('Failed to load points of interest:', error.message);
-            this.statusText.setText(`Error: ${error.message}`);
-        }
-    }
-
+    /**
+     * Обновляет сцену.
+     */
     update() {
-        // Проверяем, изменился ли гекс игрока, и обновляем точки интереса
-        const currentHex = this.hexGrid.findHexAt(this.player.x, this.player.y);
-        if (currentHex && (!this.lastHex || this.lastHex.q !== currentHex.q || this.lastHex.r !== currentHex.r)) {
-            this.loadPointsOfInterest();
-            this.lastHex = currentHex;
-        }
+        // Здесь можно добавить дополнительную логику, если нужно
     }
 
+    /**
+     * Переключает сцену на GameOver.
+     */
     changeScene() {
         this.scene.start('GameOver');
     }
