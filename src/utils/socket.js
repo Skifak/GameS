@@ -15,7 +15,7 @@ const token = localStorage.getItem("token");
 
 /**
  * Клиент Colyseus для подключения к игровым комнатам.
- * @type {Object}
+ * @type {Client}
  */
 const client = new Client(import.meta.env.VITE_WS_URL, { token });
 

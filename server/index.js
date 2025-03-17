@@ -1,3 +1,9 @@
+/**
+ * Главный файл серверной части приложения.
+ * Настраивает Express-сервер, Colyseus-комнаты и интеграцию с Redis и Supabase.
+ * @module Server
+ */
+
 import express from "express";
 import { Server, Room } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
@@ -13,9 +19,22 @@ import config from "./config.js";
 
 dotenv.config();
 
+/**
+ * Клиент Supabase для аутентификации и работы с базой данных.
+ * @type {import('@supabase/supabase-js').SupabaseClient}
+ */
 const supabase = createSupabaseClient(process.env.SUPABASE_PUBLIC_URL, process.env.SUPABASE_ANON_KEY);
 
+/**
+ * Клиент Redis для хранения данных сессий.
+ * @type {import('redis').RedisClientType|null}
+ */
 let redisClient;
+
+/**
+ * Инициализирует подключение к Redis.
+ * @async
+ */
 async function initRedis() {
     if (config.allowMissingRedis) {
         logger.warn("Redis initialization skipped as per configuration");
@@ -35,12 +54,21 @@ async function initRedis() {
     }
 }
 
+/**
+ * Экземпляр Express-приложения.
+ * @type {import('express').Express}
+ */
 const app = express();
 
 app.use(cors(config.cors));
 app.use(express.json());
 
-// Middleware для проверки токена
+/**
+ * Middleware для проверки JWT-токена в запросах.
+ * @param {import('express').Request} req - Входящий запрос
+ * @param {import('express').Response} res - Ответ сервера
+ * @param {import('express').NextFunction} next - Следующая функция в цепочке middleware
+ */
 const authMiddleware = async (req, res, next) => {
     const token = req.headers.authorization?.split('Bearer ')[1];
     if (!token) {
@@ -60,16 +88,46 @@ const authMiddleware = async (req, res, next) => {
     }
 };
 
+/**
+ * HTTP-сервер для Express и WebSocket.
+ * @type {import('http').Server}
+ */
 const server = http.createServer(app);
+
+/**
+ * WebSocket-транспорт для Colyseus.
+ * @type {WebSocketTransport}
+ */
 const transport = new WebSocketTransport({ server });
+
+/**
+ * Экземпляр игрового сервера Colyseus.
+ * @type {Server}
+ */
 const gameServer = new Server({ transport });
 
+/**
+ * Класс комнаты Colyseus для управления игровыми сессиями.
+ * @extends Room
+ */
 class HexRoom extends Room {
+    /**
+     * Вызывается при создании комнаты.
+     * @param {Object} options - Опции создания комнаты
+     */
     onCreate(options) {
         this.maxClients = 20;
         logger.info("Hex room created");
     }
 
+    /**
+     * Проверяет аутентификацию клиента перед подключением к комнате.
+     * @async
+     * @param {import('colyseus').Client} client - Клиент, подключающийся к комнате
+     * @param {Object} options - Опции подключения, включая токен
+     * @returns {Promise<{user: Object, profile: Object}>} Данные пользователя и профиля
+     * @throws {Error} Если токен отсутствует, недействителен или пользователь забанен
+     */
     async onAuth(client, options) {
         if (!options.token) throw new Error("No token provided");
 
@@ -90,6 +148,13 @@ class HexRoom extends Room {
         return { user, profile };
     }
 
+    /**
+     * Вызывается при успешном подключении клиента к комнате.
+     * @async
+     * @param {import('colyseus').Client} client - Подключившийся клиент
+     * @param {Object} options - Опции подключения
+     * @param {{user: Object, profile: Object}} auth - Данные аутентификации клиента
+     */
     async onJoin(client, options, auth) {
         logger.info(`Player ${auth.profile.username} joined room ${this.roomId}`);
         if (redisClient) {
@@ -101,6 +166,12 @@ class HexRoom extends Room {
         }
     }
 
+    /**
+     * Вызывается при отключении клиента от комнаты.
+     * @async
+     * @param {import('colyseus').Client} client - Отключившийся клиент
+     * @param {boolean} consented - Указывает, было ли отключение добровольным
+     */
     async onLeave(client, consented) {
         logger.info(`Player ${client.sessionId} left`);
         if (redisClient) {
@@ -113,6 +184,10 @@ class HexRoom extends Room {
     }
 }
 
+/**
+ * Инициализирует сервер, подключает Redis, определяет комнату и запускает сервер.
+ * @async
+ */
 (async () => {
     await initRedis();
     gameServer.define("hex", HexRoom);

@@ -24,6 +24,9 @@ export function useAuth() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    /**
+     * Инициализирует состояние пользователя и подписывается на изменения состояния аутентификации.
+     */
     useEffect(() => {
         const fetchUser = async () => {
             try {
@@ -49,6 +52,13 @@ export function useAuth() {
         return () => authListener.subscription.unsubscribe();
     }, []);
 
+    /**
+     * Выполняет вход пользователя.
+     * @async
+     * @param {string} email - Электронная почта пользователя
+     * @param {string} password - Пароль пользователя
+     * @returns {Promise<{success: boolean, message: string, user?: Object}>} Результат операции входа
+     */
     const signIn = async (email, password) => {
         try {
             setLoading(true);
@@ -67,6 +77,14 @@ export function useAuth() {
         }
     };
 
+    /**
+     * Регистрирует нового пользователя.
+     * @async
+     * @param {string} email - Электронная почта пользователя
+     * @param {string} password - Пароль пользователя
+     * @param {string} username - Имя пользователя
+     * @returns {Promise<{success: boolean, message: string}>} Результат операции регистрации
+     */
     const signUp = async (email, password, username) => {
         try {
             setLoading(true);
@@ -90,6 +108,11 @@ export function useAuth() {
         }
     };
 
+    /**
+     * Выполняет выход пользователя.
+     * @async
+     * @returns {Promise<{success: boolean, message: string}>} Результат операции выхода
+     */
     const signOut = async () => {
         try {
             setLoading(true);

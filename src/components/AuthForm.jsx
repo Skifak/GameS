@@ -20,6 +20,11 @@ function AuthForm() {
     const [isError, setIsError] = useState(false);
     const { signIn, signUp, loading } = useAuth();
 
+    /**
+     * Обрабатывает отправку формы для входа или регистрации.
+     * @async
+     * @param {Event} e - Событие отправки формы
+     */
     const handleSubmit = async (e) => {
         e.preventDefault();
         setMessage('');

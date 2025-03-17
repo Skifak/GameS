@@ -1,3 +1,9 @@
+/**
+ * Модуль конфигурации сервера.
+ * Загружает переменные окружения, определяет среду выполнения и предоставляет настройки для разных сред.
+ * @module ServerConfig
+ */
+
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -7,11 +13,16 @@ import fs from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Проверяем наличие .env.local для локальной разработки
+/**
+ * Проверяет наличие файла .env.local и определяет, используется ли локальная разработка.
+ * @type {boolean}
+ */
 const localEnvPath = path.resolve(__dirname, '../.env');
 const hasLocalEnv = fs.existsSync(localEnvPath);
 
-// Загружаем переменные окружения из соответствующего файла
+/**
+ * Загружает переменные окружения из файла .env в зависимости от среды.
+ */
 if (hasLocalEnv && process.env.NODE_ENV === 'development') {
   console.log('Loading environment from .env.local');
   dotenv.config({ path: localEnvPath });
@@ -20,12 +31,31 @@ if (hasLocalEnv && process.env.NODE_ENV === 'development') {
   dotenv.config();
 }
 
-// Определяем текущую среду
+/**
+ * Текущая среда выполнения (development или production).
+ * @type {string}
+ */
 const NODE_ENV = process.env.NODE_ENV || 'development';
+
+/**
+ * Флаг локальной разработки.
+ * @type {boolean}
+ */
 const isLocalDev = hasLocalEnv && NODE_ENV === 'development';
+
+/**
+ * Флаг работы в Docker-контейнере.
+ * @type {boolean}
+ */
 const isDocker = process.env.DOCKER_ENV === 'true';
 
-// Функция для получения URL с учетом локальной разработки и Docker
+/**
+ * Получает URL сервиса с учётом среды (локальная разработка или Docker).
+ * @param {string} envVar - Имя переменной окружения для URL сервиса
+ * @param {string} dockerUrl - URL по умолчанию для Docker
+ * @param {number} localPort - Порт для локальной разработки
+ * @returns {string} Итоговый URL сервиса
+ */
 const getServiceUrl = (envVar, dockerUrl, localPort) => {
   const envValue = process.env[envVar];
   if (envValue) return envValue;
@@ -52,7 +82,10 @@ const getServiceUrl = (envVar, dockerUrl, localPort) => {
   return dockerUrl;
 };
 
-// Базовая конфигурация с значениями по умолчанию
+/**
+ * Базовая конфигурация сервера с значениями по умолчанию.
+ * @type {Object}
+ */
 const baseConfig = {
   port: process.env.PORT || 2567,
   redisUrl: getServiceUrl('REDIS_URL', 'redis://redis:6379', 6379),
@@ -63,7 +96,10 @@ const baseConfig = {
   isDocker
 };
 
-// Конфигурация для разных сред
+/**
+ * Конфигурации для разных сред (development и production).
+ * @type {Object}
+ */
 const envConfig = {
   development: {
     debug: true,
@@ -97,14 +133,19 @@ const envConfig = {
   },
 };
 
-// Объединяем базовую конфигурацию с конфигурацией для текущей среды
+/**
+ * Итоговая конфигурация сервера, объединяющая базовые настройки и настройки для текущей среды.
+ * @type {Object}
+ */
 const config = {
   ...baseConfig,
   ...(envConfig[NODE_ENV] || envConfig.development),
   env: NODE_ENV,
 };
 
-// Предупреждение при использовании значений по умолчанию для секретов в production
+/**
+ * Выводит предупреждение, если используется дефолтный секрет JWT в продакшене.
+ */
 if (NODE_ENV === 'production') {
   if (baseConfig.jwtSecret === 'dev-secret-key-do-not-use-in-production') {
     console.warn('WARNING: Using default JWT secret in production environment!');

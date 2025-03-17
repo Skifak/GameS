@@ -9,6 +9,7 @@ import Phaser from 'phaser';
 // https://newdocs.phaser.io/docs/3.70.0/Phaser.Events.EventEmitter
 /**
  * Экземпляр событийной шины Phaser.
+ * Используется для передачи событий между React-компонентами и сценами Phaser.
  * @type {Phaser.Events.EventEmitter}
  */
 export const EventBus = new Phaser.Events.EventEmitter();

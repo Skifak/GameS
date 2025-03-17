@@ -14,13 +14,31 @@ import { supabase } from '../../lib/supabase';
  * @extends Phaser.Scene
  */
 export default class HexGrid extends Phaser.Scene {
+    /**
+     * Создаёт экземпляр сцены HexGrid.
+     */
     constructor() {
         super('HexGrid');
+        /**
+         * Клиент Colyseus для подключения к серверу.
+         * @type {Client}
+         */
         this.client = new Client('ws://localhost:2567');
+        /**
+         * Текст статуса подключения.
+         * @type {Phaser.GameObjects.Text|null}
+         */
         this.statusText = null;
+        /**
+         * Комната Colyseus, к которой подключён клиент.
+         * @type {import('colyseus.js').Room|null}
+         */
         this.room = null;
     }
 
+    /**
+     * Инициализирует сцену, добавляет текст статуса и запускает подключение к комнате.
+     */
     create() {
         this.statusText = this.add.text(100, 100, 'Connecting to Colyseus...', { 
             color: '#ffffff',
@@ -31,6 +49,10 @@ export default class HexGrid extends Phaser.Scene {
         EventBus.emit('current-scene-ready', this);
     }
 
+    /**
+     * Подключает клиента к комнате Colyseus с использованием данных пользователя из Supabase.
+     * @async
+     */
     async connectToRoom() {
         try {
             const { data: { user }, error: userError } = await supabase.auth.getUser();

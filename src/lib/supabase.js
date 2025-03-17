@@ -36,7 +36,7 @@ export const auth = {
      * @param {string} email - Электронная почта пользователя
      * @param {string} password - Пароль пользователя
      * @param {string} username - Имя пользователя (3-20 символов, только буквы и цифры)
-     * @returns {Promise<{user: object, profile: object, session: object}>} Объект с данными пользователя, профиля и сессии
+     * @returns {Promise<{user: Object, profile: Object, session: Object}>} Объект с данными пользователя, профиля и сессии
      * @throws {Error} Если регистрация или создание профиля не удались
      */
     async signUp(email, password, username) {
@@ -66,7 +66,7 @@ export const auth = {
      * @async
      * @param {string} email - Электронная почта пользователя
      * @param {string} password - Пароль пользователя
-     * @returns {Promise<{user: object, profile: object, session: object}>} Объект с данными пользователя, профиля и сессии
+     * @returns {Promise<{user: Object, profile: Object, session: Object}>} Объект с данными пользователя, профиля и сессии
      * @throws {Error} Если вход или работа с профилем не удались
      */
     async signIn(email, password) {
@@ -87,7 +87,7 @@ export const auth = {
                 .from('profiles')
                 .insert({
                     id: data.user.id,
-                    username: email.split('@')[0], // Используем часть email как временное имя
+                    username: email.split('@')[0], // Используем часть email как временное имя если нет ввода username
                     email,
                     role: 'player',
                     created_at: new Date().toISOString(),
@@ -133,7 +133,7 @@ export const auth = {
     /**
      * Получает данные текущего пользователя и его профиля.
      * @async
-     * @returns {Promise<object|null>} Объект с данными пользователя и профиля или null, если пользователь не авторизован
+     * @returns {Promise<Object|null>} Объект с данными пользователя и профиля или null, если пользователь не авторизован
      * @throws {Error} Если запрос профиля не удался
      */
     async getCurrentUser() {

@@ -21,6 +21,9 @@ export const PhaserGame = forwardRef(function PhaserGame({ currentActiveScene },
     const game = useRef(null);
     const { loading } = useAuth();
 
+    /**
+     * Создаёт игру при монтировании и уничтожает при размонтировании.
+     */
     useLayoutEffect(() => {
         if (!loading && !game.current) {
             game.current = StartGame("game-container");
@@ -37,6 +40,9 @@ export const PhaserGame = forwardRef(function PhaserGame({ currentActiveScene },
         };
     }, [ref, loading]);
 
+    /**
+     * Подписывается на событие готовности сцены и передаёт текущую сцену через ref и коллбэк.
+     */
     useEffect(() => {
         EventBus.on('current-scene-ready', (currentScene) => {
             if (currentActiveScene instanceof Function) {
@@ -59,6 +65,10 @@ export const PhaserGame = forwardRef(function PhaserGame({ currentActiveScene },
     return <div id="game-container"></div>;
 });
 
+/**
+ * Проверка типов свойств компонента PhaserGame.
+ * @type {Object}
+ */
 PhaserGame.propTypes = {
     currentActiveScene: PropTypes.func
 };
