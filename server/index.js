@@ -1,6 +1,6 @@
 /**
  * Главный файл серверной части приложения.
- * Настраивает Express-сервер, Colyseus-комнаты и интеграцию с Redis и Supabase.
+ * Настраивает Express-сервер, Colyseus-комнаты и интеграцию с Redis.
  * @module Server
  */
 
@@ -11,41 +11,34 @@ import { monitor } from "@colyseus/monitor";
 import { createClient } from "redis";
 import http from "http";
 import dotenv from "dotenv";
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import cors from "cors";
-import adminRouter from './admin.js'; // Новый роутер для администрирования
+import { fileURLToPath } from 'url';
+import path from 'path';
+import adminRouter from './admin.js';
 import { PointRoom } from './pointRoom.js';
-
 import logger from "./logger.js";
 import config from "./config.js";
 
-dotenv.config();
+// Определяем __dirname для ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-/**
- * Клиент Supabase для аутентификации и работы с базой данных.
- * @type {import('@supabase/supabase-js').SupabaseClient}
- */
-const supabase = createSupabaseClient(process.env.SUPABASE_PUBLIC_URL, process.env.SUPABASE_ANON_KEY);
+// Загружаем .env.local из корня проекта
+dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
 
-/**
- * Клиент Redis для хранения данных сессий.
- * @type {import('redis').RedisClientType|null}
- */
+const app = express();
+const server = http.createServer(app);
+const transport = new WebSocketTransport({ server });
+const gameServer = new Server({ transport });
+
 let redisClient;
 
-/**
- * Инициализирует подключение к Redis.
- * @async
- */
 async function initRedis() {
     if (config.allowMissingRedis) {
         logger.warn("Redis initialization skipped as per configuration");
         return;
     }
-
-    redisClient = createClient({
-        url: config.redisUrl
-    });
+    redisClient = createClient({ url: config.redisUrl });
     redisClient.on("error", (err) => logger.error("Redis Client Error", err));
     try {
         await redisClient.connect();
@@ -56,108 +49,34 @@ async function initRedis() {
     }
 }
 
-/**
- * Экземпляр Express-приложения.
- * @type {import('express').Express}
- */
-const app = express();
-
 app.use(cors(config.cors));
 app.use(express.json());
-app.use('/admin', adminRouter); // Подключаем API администрирования
+app.use('/admin', adminRouter);
 
-/**
- * Middleware для проверки JWT-токена в запросах.
- * @param {import('express').Request} req - Входящий запрос
- * @param {import('express').Response} res - Ответ сервера
- * @param {import('express').NextFunction} next - Следующая функция в цепочке middleware
- */
-const authMiddleware = async (req, res, next) => {
-    const token = req.headers.authorization?.split('Bearer ')[1];
-    if (!token) {
-        logger.warn('No token provided in request');
-        return res.status(401).json({ error: 'No token provided' });
-    }
-
-    try {
-        const { data: { user }, error } = await supabase.auth.getUser(token);
-        if (error) throw new Error('Invalid token');
-        req.user = user;
-        logger.info(`Player ${user.email} attempted to connect`);
-        next();
-    } catch (error) {
-        logger.error('Token validation error:', error.message);
-        res.status(401).json({ error: 'Invalid token' });
-    }
-};
-
-/**
- * HTTP-сервер для Express и WebSocket.
- * @type {import('http').Server}
- */
-const server = http.createServer(app);
-
-/**
- * WebSocket-транспорт для Colyseus.
- * @type {WebSocketTransport}
- */
-const transport = new WebSocketTransport({ server });
-
-/**
- * Экземпляр игрового сервера Colyseus.
- * @type {Server}
- */
-const gameServer = new Server({ transport });
-
-/**
- * Класс комнаты Colyseus для управления игровыми сессиями.
- * @extends Room
- */
 class HexRoom extends Room {
-    /**
-     * Вызывается при создании комнаты.
-     * @param {Object} options - Опции создания комнаты
-     */
     onCreate(options) {
         this.maxClients = 20;
         logger.info("Hex room created");
     }
 
-    /**
-     * Проверяет аутентификацию клиента перед подключением к комнате.
-     * @async
-     * @param {import('colyseus').Client} client - Клиент, подключающийся к комнате
-     * @param {Object} options - Опции подключения, включая токен
-     * @returns {Promise<{user: Object, profile: Object}>} Данные пользователя и профиля
-     * @throws {Error} Если токен отсутствует, недействителен или пользователь забанен
-     */
     async onAuth(client, options) {
+        const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
         if (!options.token) throw new Error("No token provided");
-
-        const { data: { user }, error } = await supabase.auth.getUser(options.token);
+        const supabase = createSupabaseClient(process.env.SUPABASE_PUBLIC_URL, process.env.ANON_KEY, {
+            global: { headers: { Authorization: `Bearer ${options.token}` } }
+        });
+        const { data: { user }, error } = await supabase.auth.getUser();
         if (error) throw new Error("Invalid token");
-
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', user.id)
             .single();
         if (profileError) throw new Error(profileError.message);
-
-        if (profile.role === 'banned') {
-            throw new Error('User is banned');
-        }
-
+        if (profile.role === 'banned') throw new Error('User is banned');
         return { user, profile };
     }
 
-    /**
-     * Вызывается при успешном подключении клиента к комнате.
-     * @async
-     * @param {import('colyseus').Client} client - Подключившийся клиент
-     * @param {Object} options - Опции подключения
-     * @param {{user: Object, profile: Object}} auth - Данные аутентификации клиента
-     */
     async onJoin(client, options, auth) {
         logger.info(`Player ${auth.profile.username} joined room ${this.roomId}`);
         if (redisClient) {
@@ -169,12 +88,6 @@ class HexRoom extends Room {
         }
     }
 
-    /**
-     * Вызывается при отключении клиента от комнаты.
-     * @async
-     * @param {import('colyseus').Client} client - Отключившийся клиент
-     * @param {boolean} consented - Указывает, было ли отключение добровольным
-     */
     async onLeave(client, consented) {
         logger.info(`Player ${client.sessionId} left`);
         if (redisClient) {
@@ -187,14 +100,40 @@ class HexRoom extends Room {
     }
 }
 
-/**
- * Инициализирует сервер, подключает Redis, определяет комнату и запускает сервер.
- * @async
- */
 (async () => {
-    await initRedis();
-    gameServer.define("hex", HexRoom);
-    gameServer.define("point", PointRoom); // Определяем новую комнату для точек
-    app.use("/colyseus", monitor());
-    server.listen(config.port, () => logger.info(`Game server running on port ${config.port}`));
+    try {
+        // Проверка переменных окружения внутри функции
+        const supabaseUrl = process.env.SUPABASE_PUBLIC_URL;
+        const anonKey = process.env.ANON_KEY;
+
+        console.log('SUPABASE_PUBLIC_URL:', supabaseUrl || 'Not set');
+        console.log('ANON_KEY:', anonKey || 'Not set');
+
+        if (!supabaseUrl) {
+            logger.error('SUPABASE_PUBLIC_URL is missing in .env.local');
+            process.exit(1);
+        }
+        if (!anonKey) {
+            logger.error('ANON_KEY is missing in .env.local');
+            process.exit(1);
+        }
+
+        await initRedis();
+        console.log('Registering rooms...');
+        console.log('HexRoom defined');
+        gameServer.define("hex", HexRoom);
+        console.log('PointRoom defined:', typeof PointRoom === 'function' ? 'Yes' : 'No');
+        gameServer.define("point", PointRoom, { supabaseUrl, anonKey });
+        console.log('Rooms registered successfully');
+
+        app.use("/colyseus", monitor());
+        server.listen(config.port, () => {
+            logger.info(`Game server running on port ${config.port}`);
+            console.log(`Server started on http://localhost:${config.port}`);
+        });
+    } catch (error) {
+        logger.error('Server startup failed:', error.message);
+        console.error('Server startup error:', error);
+        process.exit(1);
+    }
 })();

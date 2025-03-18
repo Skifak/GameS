@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Module: PhaserMain</title>
+    <title>JSDoc: Module: logger</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Module: PhaserMain</h1>
+    <h1 class="page-title">Module: logger</h1>
 
     
 
@@ -31,8 +31,6 @@
         
             
         
-            
-        
     
 </header>
 
@@ -40,7 +38,7 @@
     <div class="container-overview">
     
         
-            <div class="description">Главный файл для инициализации игры Phaser.Определяет конфигурацию и запускает игру с указанной сценой.</div>
+            <div class="description">Простой логгер для клиентской части приложения.Выводит сообщения в консоль с меткой времени.</div>
         
 
         
@@ -89,7 +87,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="game_main.js.html">game/main.js</a>, <a href="game_main.js.html#line1">line 1</a>
+        <a href="utils_logger.js.html">utils/logger.js</a>, <a href="utils_logger.js.html#line1">line 1</a>
     </li></ul></dd>
     
 
@@ -120,12 +118,33 @@
 
 
         
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+        <h3 class="subsection-title">Methods</h3>
+
+        
             
 
     
 
     
-    <h4 class="name" id="module:PhaserMain"><span class="type-signature"></span>(require("PhaserMain"))<span class="signature">(parent)</span><span class="type-signature"> &rarr; {Phaser.Game}</span></h4>
+    <h4 class="name" id="~error"><span class="type-signature">(inner) </span>error<span class="signature">(message)</span><span class="type-signature"></span></h4>
     
 
     
@@ -133,7 +152,7 @@
 
 
 <div class="description">
-    Запускает игру Phaser с заданным родительским элементом.
+    Логирует сообщение об ошибке.
 </div>
 
 
@@ -169,7 +188,7 @@
 
         <tr>
             
-                <td class="name"><code>parent</code></td>
+                <td class="name"><code>message</code></td>
             
 
             <td class="type">
@@ -185,7 +204,7 @@
 
             
 
-            <td class="description last">ID родительского HTML-элемента</td>
+            <td class="description last">Сообщение об ошибке</td>
         </tr>
 
     
@@ -226,7 +245,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="game_main.js.html">game/main.js</a>, <a href="game_main.js.html#line32">line 32</a>
+        <a href="utils_logger.js.html">utils/logger.js</a>, <a href="utils_logger.js.html#line19">line 19</a>
     </li></ul></dd>
     
 
@@ -251,74 +270,84 @@
 
 
 
-<h5>Returns:</h5>
-
-        
-<div class="param-desc">
-    Экземпляр игры Phaser
-</div>
-
-
-
-<dl>
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type">Phaser.Game</span>
-
-
-    </dd>
-</dl>
-
-    
 
 
 
 
-
-        
-    
-    </div>
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-        <h3 class="subsection-title">Members</h3>
 
         
             
-<h4 class="name" id="~config"><span class="type-signature">(inner, constant) </span>config<span class="type-signature"> :Object</span></h4>
 
+    
+
+    
+    <h4 class="name" id="~info"><span class="type-signature">(inner) </span>info<span class="signature">(message)</span><span class="type-signature"></span></h4>
+    
+
+    
 
 
 
 <div class="description">
-    Конфигурация игры Phaser.
+    Логирует информационное сообщение.
 </div>
 
 
 
-    <h5>Type:</h5>
-    <ul>
-        <li>
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
             
-<span class="param-type">Object</span>
+                <td class="name"><code>message</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
 
 
-        </li>
-    </ul>
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Сообщение для логирования</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
 
 
 
@@ -353,7 +382,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="game_main.js.html">game/main.js</a>, <a href="game_main.js.html#line14">line 14</a>
+        <a href="utils_logger.js.html">utils/logger.js</a>, <a href="utils_logger.js.html#line11">line 11</a>
     </li></ul></dd>
     
 
@@ -369,9 +398,21 @@
 
 
 
-        
-    
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
     
 
     

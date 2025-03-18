@@ -27,54 +27,111 @@
     <section>
         <article>
             <pre class="prettyprint source linenums"><code>/**
- * Сцена с шестиугольной сеткой для Phaser.
- * Подключается к комнате Colyseus и отображает статус соединения.
- * @module HexGridScene
+ * Класс для управления гексагональной сеткой в Phaser.
+ * Отвечает за отрисовку гексов и точек интереса на основе данных с сервера.
+ * @module HexGrid
  */
 
-import Phaser from "phaser";
-import client from "../../utils/socket";
-import { EventBus } from "../EventBus";
+import Phaser from 'phaser';
+import { EventBus } from '../EventBus';
 
-/**
- * Класс сцены с шестиугольной сеткой.
- * @extends Phaser.Scene
- */
-export default class HexGrid extends Phaser.Scene {
-    /**
-     * Создаёт экземпляр сцены HexGrid.
-     */
-    constructor() {
-        super("HexGrid");
+export class HexGrid {
+    constructor(scene, room) {
+        this.scene = scene;
+        this.room = room;
+        this.hexSize = 117;
+        this.hexGroup = this.scene.add.group();
+        this.pointsGroup = this.scene.add.group();
     }
 
-    /**
-     * Инициализирует сцену, отображая текст статуса и подключаясь к комнате Colyseus.
-     */
-    create() {
-        this.statusText = this.add.text(100, 100, "Connecting to Colyseus...", { color: "#ffffff" });
-        this.time.delayedCall(100, this.connectToRoom, [], this); // Отложим подключение
-        EventBus.emit("current-scene-ready", this);
+    async initGrid() {
+        await this.loadHexes();
+        await this.loadPoints();
     }
 
-    /**
-     * Подключается к комнате Colyseus с именем "hex".
-     * Обновляет текст статуса в зависимости от результата.
-     * @async
-     */
-    async connectToRoom() {
+    async loadHexes() {
         try {
-            this.room = await client.joinOrCreate("hex", { hexId: "hex_1" });
-            if (this.scene.isActive()) { // Проверяем, активна ли сцена
-                this.statusText.setText("Connected to Colyseus");
-                console.log("Client connected to room");
-            }
+            const { data, error } = await this.scene.supabase
+                .from('hexes')
+                .select('q, r, type');
+            if (error) throw new Error(error.message);
+
+            data.forEach(hex => this.drawHex(hex.q, hex.r, hex.type));
+            this.hexGroup.getChildren().forEach(hex => hex.setDepth(1));
         } catch (error) {
-            console.error("Failed to join room:", error);
-            if (this.scene.isActive()) {
-                this.statusText.setText("Failed to connect");
-            }
+            console.error('Failed to load hexes:', error.message);
         }
+    }
+
+    async loadPoints() {
+        try {
+            const { data, error } = await this.scene.supabase
+                .from('points_of_interest')
+                .select('id, hex_q, hex_r, type, x, y');
+            if (error) throw new Error(error.message);
+
+            console.log('Loaded points:', data);
+            data.forEach(point => this.drawPoint(point));
+            this.pointsGroup.getChildren().forEach(point => point.setDepth(2));
+        } catch (error) {
+            console.error('Failed to load points:', error.message);
+        }
+    }
+
+    drawHex(q, r, type) {
+        const hexWidth = this.hexSize * Math.sqrt(3);
+        const hexHeight = this.hexSize * 2;
+        const x = hexWidth * (q + (r % 2) * 0.5) + 10;
+        const y = hexHeight * 0.75 * r + 45;
+
+        const colors = {
+            neutral: 0xaaaaaa,
+            free: 0x00ff00,
+            danger: 0xff0000,
+            controlled: 0x0000ff
+        };
+
+        const points = [
+            0, -this.hexSize,
+            this.hexSize * Math.sqrt(3) / 2, -this.hexSize / 2,
+            this.hexSize * Math.sqrt(3) / 2, this.hexSize / 2,
+            0, this.hexSize,
+            -this.hexSize * Math.sqrt(3) / 2, this.hexSize / 2,
+            -this.hexSize * Math.sqrt(3) / 2, -this.hexSize / 2
+        ];
+
+        const hex = this.scene.add.polygon(x, y, points, colors[type] || 0xaaaaaa, 0.7);
+        hex.setData({ q, r, type });
+        this.hexGroup.add(hex);
+    }
+
+    drawPoint(point) {
+        const typeColors = {
+            camp: 0x4B712E,
+            transition: 0xffcf5b,
+            normal: 0xaaaaaa,
+            anomaly: 0xff0000,
+            faction: 0x0000ff
+        };
+
+        const circle = this.scene.add.circle(point.x, point.y, 10, typeColors[point.type] || 0xaaaaaa, 0.7);
+        circle.setInteractive();
+        circle.on('pointerdown', () => {
+            console.log('Point clicked:', point.id, 'at', point.x, point.y);
+            this.handlePointClick(point.id);
+        });
+        circle.setData({ id: point.id, type: point.type, hex_q: point.hex_q, hex_r: point.hex_r });
+        this.pointsGroup.add(circle);
+    }
+
+    handlePointClick(pointId) {
+        console.log('Emitting moveToPoint for point:', pointId);
+        EventBus.emit('moveToPoint', pointId); // Локальное событие вместо Colyseus
+    }
+
+    clearGrid() {
+        this.hexGroup.clear(true, true);
+        this.pointsGroup.clear(true, true);
     }
 }</code></pre>
         </article>
@@ -86,13 +143,13 @@ export default class HexGrid extends Phaser.Scene {
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-App.html">App</a></li><li><a href="module-AuthForm.html">AuthForm</a></li><li><a href="module-ClientConfig.html">ClientConfig</a></li><li><a href="module-ClientLogger.html">ClientLogger</a></li><li><a href="module-EventBus.html">EventBus</a></li><li><a href="module-GameScene.html">GameScene</a></li><li><a href="module-HexGridScene.html">HexGridScene</a></li><li><a href="module-Main.html">Main</a></li><li><a href="module-PhaserGame.html">PhaserGame</a></li><li><a href="module-PhaserMain.html">PhaserMain</a></li><li><a href="module-SocketClient.html">SocketClient</a></li></ul><h3>Classes</h3><ul><li><a href="module-GameScene.Game.html">Game</a></li><li><a href="module-HexGridScene.html">HexGridScene</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-App.html">App</a></li><li><a href="module-AuthForm.html">AuthForm</a></li><li><a href="module-ClientConfig.html">ClientConfig</a></li><li><a href="module-EventBus.html">EventBus</a></li><li><a href="module-GameScene.html">GameScene</a></li><li><a href="module-HexGrid.html">HexGrid</a></li><li><a href="module-Main.html">Main</a></li><li><a href="module-PhaserGame.html">PhaserGame</a></li><li><a href="module-PhaserMain.html">PhaserMain</a></li><li><a href="module-logger.html">logger</a></li><li><a href="module-supabase.html">supabase</a></li><li><a href="module-useAuth.html">useAuth</a></li></ul><h3>Namespaces</h3><ul><li><a href="module-supabase-auth.html">auth</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sat Mar 15 2025 21:51:46 GMT+0300 (Москва, стандартное время)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Tue Mar 18 2025 21:51:00 GMT+0300 (Москва, стандартное время)
 </footer>
 
 <script> prettyPrint(); </script>

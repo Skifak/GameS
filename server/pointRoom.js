@@ -5,112 +5,121 @@
  */
 
 import { Room } from 'colyseus';
-import { supabase } from './index.js';
+import { createClient } from '@supabase/supabase-js';
 import logger from './logger.js';
 
-/**
- * Класс комнаты для точки интереса.
- * @extends Room
- */
 export class PointRoom extends Room {
-    /**
-     * Инициализирует комнату для точки интереса.
-     * @param {Object} options - Опции создания комнаты
-     */
-    onCreate(options) {
-        this.pointId = options.pointId; // ID точки интереса
-        this.maxClients = 10; // Максимум 10 игроков
-        this.setState({
-            players: {}, // Состояние игроков: { [sessionId]: { x, y, playerId } }
-            point: null // Данные о точке интереса
-        });
-        logger.info(`PointRoom created for point ${this.pointId}`);
+    constructor() {
+        super();
+        this.supabaseUrl = null;
+        this.anonKey = null;
+    }
 
-        // Загружаем данные точки из Supabase
+    onCreate(options) {
+        this.supabaseUrl = options.supabaseUrl;
+        this.anonKey = options.anonKey;
+        this.pointId = options.pointId;
+        this.maxClients = 10;
+        this.setState({ players: {}, point: null });
+        logger.info(`PointRoom created for point ${this.pointId}`);
         this.loadPointData();
     }
 
-    /**
-     * Загружает данные точки интереса из Supabase.
-     * @async
-     */
     async loadPointData() {
+        const supabase = createClient(this.supabaseUrl, this.anonKey);
         try {
             const { data, error } = await supabase
                 .from('points_of_interest')
                 .select('id, hex_q, hex_r, type, x, y')
                 .eq('id', this.pointId)
                 .single();
-            if (error) throw new Error(error.message);
+            if (error) throw error;
             this.state.point = data;
+            logger.info(`Point ${this.pointId} loaded:`, data);
         } catch (error) {
-            logger.error(`Failed to load point ${this.pointId}: ${error.message}`);
+            logger.error(`Failed to load point ${this.pointId}:`, error.message);
         }
     }
 
-    /**
-     * Проверяет аутентификацию клиента перед подключением.
-     * @async
-     * @param {import('colyseus').Client} client - Клиент, подключающийся к комнате
-     * @param {Object} options - Опции подключения
-     * @returns {Promise<{user: Object, profile: Object}>} Данные пользователя и профиля
-     * @throws {Error} Если аутентификация не удалась
-     */
     async onAuth(client, options) {
-        if (!options.token) throw new Error('No token provided');
+        logger.info('Options received:', JSON.stringify(options, null, 2));
+        if (!options || !options.token) {
+            logger.error('No token provided in options:', options);
+            throw new Error('No token provided');
+        }
+        logger.info('Validating token:', options.token);
 
-        const { data: { user }, error } = await supabase.auth.getUser(options.token);
-        if (error) throw new Error('Invalid token');
+        const supabase = createClient(this.supabaseUrl, this.anonKey, {
+            global: { headers: { Authorization: `Bearer ${options.token}` } }
+        });
 
-        const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-        if (profileError) throw new Error(profileError.message);
-        if (profile.role === 'banned') throw new Error('User is banned');
+        try {
+            const { data: { user }, error } = await supabase.auth.getUser();
+            if (error) {
+                logger.error('Supabase auth error:', error.message, error);
+                throw new Error('Invalid token');
+            }
+            logger.info('User authenticated:', user.id);
 
-        return { user, profile };
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+            if (profileError) {
+                logger.error('Profile fetch error:', profileError.message, profileError);
+                throw new Error(profileError.message);
+            }
+            logger.info('Profile loaded:', profile);
+
+            if (profile.role === 'banned') {
+                logger.error('User banned:', user.id);
+                throw new Error('User is banned');
+            }
+
+            return { user, profile };
+        } catch (err) {
+            logger.error('Unexpected error during auth:', err.message, err.stack);
+            throw err;
+        }
     }
 
-    /**
-     * Вызывается при подключении клиента к комнате.
-     * @async
-     * @param {import('colyseus').Client} client - Подключившийся клиент
-     * @param {Object} options - Опции подключения
-     * @param {{user: Object, profile: Object}} auth - Данные аутентификации
-     */
     async onJoin(client, options, auth) {
-        logger.info(`Player ${auth.profile.username} joined PointRoom ${this.roomId}`);
+        if (options.pointId !== this.pointId) {
+            logger.warn(`Player ${auth.profile.username} tried to join wrong room. Expected pointId: ${this.pointId}, got: ${options.pointId}`);
+            throw new Error('Invalid pointId');
+        }
+
+        logger.info(`Player ${auth.profile.username} joined PointRoom ${this.roomId} for point ${this.pointId}`);
         this.state.players[client.sessionId] = {
             playerId: auth.user.id,
             x: this.state.point?.x || 0,
             y: this.state.point?.y || 0
         };
-
-        // Проверяем переходные возможности
         this.checkTransitions(client);
     }
 
-    /**
-     * Обрабатывает сообщения от клиента.
-     * @param {import('colyseus').Client} client - Клиент, отправивший сообщение
-     * @param {Object} message - Сообщение от клиента
-     */
     onMessage(client, message) {
+        console.log('Received message:', message);
         if (message.type === 'moveToPoint') {
             this.handleMoveToPoint(client, message.pointId);
         } else if (message.type === 'transition') {
             this.handleTransition(client, message.toPointId);
+        } else if (message.type === 'click') {
+            if (!this.state.players[client.sessionId]) {
+                this.state.players[client.sessionId] = { x: message.x, y: message.y };
+            } else {
+                this.state.players[client.sessionId].x = message.x;
+                this.state.players[client.sessionId].y = message.y;
+            }
+            logger.info(`Player ${client.sessionId} clicked at (${message.x}, ${message.y})`);
         }
     }
 
-    /**
-     * Обрабатывает перемещение игрока к точке внутри гекса.
-     * @param {import('colyseus').Client} client - Клиент
-     * @param {number} pointId - ID целевой точки
-     */
     async handleMoveToPoint(client, pointId) {
+        const supabase = createClient(this.supabaseUrl, this.anonKey, {
+            global: { headers: { Authorization: `Bearer ${client.auth.token}` } }
+        });
         try {
             const { data, error } = await supabase
                 .from('points_of_interest')
@@ -124,21 +133,21 @@ export class PointRoom extends Room {
             if (data.hex_q === currentPoint.hex_q && data.hex_r === currentPoint.hex_r) {
                 player.x = data.x;
                 player.y = data.y;
-                this.state.point = data; // Обновляем текущую точку комнаты
                 logger.info(`Player ${player.playerId} moved to point ${pointId}`);
                 this.checkTransitions(client);
+            } else {
+                logger.warn(`Point ${pointId} is not in the same hex as ${this.pointId}`);
             }
         } catch (error) {
             logger.error(`Move to point ${pointId} failed: ${error.message}`);
+            client.send('error', { message: 'Move failed: ' + error.message });
         }
     }
 
-    /**
-     * Обрабатывает переход игрока в другой гекс.
-     * @param {import('colyseus').Client} client - Клиент
-     * @param {number} toPointId - ID целевой точки
-     */
     async handleTransition(client, toPointId) {
+        const supabase = createClient(this.supabaseUrl, this.anonKey, {
+            global: { headers: { Authorization: `Bearer ${client.auth.token}` } }
+        });
         try {
             const { data, error } = await supabase
                 .from('point_transitions')
@@ -156,11 +165,8 @@ export class PointRoom extends Room {
             if (pointError) throw new Error(pointError.message);
 
             const player = this.state.players[client.sessionId];
-            player.x = newPoint.x;
-            player.y = newPoint.y;
-            this.broadcast('playerTransition', { playerId: player.playerId, toPointId });
             client.send('joinNewRoom', { pointId: toPointId });
-            this.onLeave(client, true); // Удаляем игрока из текущей комнаты
+            delete this.state.players[client.sessionId];
             logger.info(`Player ${player.playerId} transitioned to point ${toPointId}`);
         } catch (error) {
             logger.error(`Transition to point ${toPointId} failed: ${error.message}`);
@@ -168,16 +174,15 @@ export class PointRoom extends Room {
         }
     }
 
-    /**
-     * Проверяет доступные переходы для игрока и отправляет информацию клиенту.
-     * @param {import('colyseus').Client} client - Клиент
-     */
     async checkTransitions(client) {
         if (this.state.point?.type !== 'transition') {
             client.send('transitions', { available: [] });
             return;
         }
 
+        const supabase = createClient(this.supabaseUrl, this.anonKey, {
+            global: { headers: { Authorization: `Bearer ${client.auth.token}` } }
+        });
         try {
             const { data, error } = await supabase
                 .from('point_transitions')
@@ -191,12 +196,6 @@ export class PointRoom extends Room {
         }
     }
 
-    /**
-     * Вызывается при отключении клиента.
-     * @async
-     * @param {import('colyseus').Client} client - Отключившийся клиент
-     * @param {boolean} consented - Было ли отключение добровольным
-     */
     async onLeave(client, consented) {
         const player = this.state.players[client.sessionId];
         if (player) {

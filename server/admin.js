@@ -5,10 +5,12 @@
  */
 
 import express from 'express';
-import { supabase } from './index.js';
+import { createClient } from '@supabase/supabase-js';
 import logger from './logger.js';
 
 const router = express.Router();
+const supabaseUrl = process.env.SUPABASE_PUBLIC_URL;
+const supabaseAnonKey = process.env.ANON_KEY;
 
 /**
  * Middleware для проверки роли администратора.
@@ -24,7 +26,10 @@ const adminMiddleware = async (req, res, next) => {
     }
 
     try {
-        const { data: { user }, error } = await supabase.auth.getUser(token);
+        const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+            global: { headers: { Authorization: `Bearer ${token}` } }
+        });
+        const { data: { user }, error } = await supabase.auth.getUser();
         if (error) throw new Error('Invalid token');
 
         const { data: profile, error: profileError } = await supabase
@@ -36,6 +41,7 @@ const adminMiddleware = async (req, res, next) => {
         if (profile.role !== 'admin') throw new Error('User is not an admin');
 
         req.user = user;
+        req.supabase = supabase; // Передаем supabase в запрос для дальнейшего использования
         next();
     } catch (error) {
         logger.error('Admin access error:', error.message);
@@ -62,7 +68,7 @@ router.put('/update-hex', async (req, res) => {
     }
 
     try {
-        const { data, error } = await supabase
+        const { data, error } = await req.supabase
             .from('hexes')
             .update({ type, updated_at: new Date().toISOString() })
             .eq('q', q)
@@ -97,7 +103,7 @@ router.post('/create-point', async (req, res) => {
     }
 
     try {
-        const { data, error } = await supabase
+        const { data, error } = await req.supabase
             .from('points_of_interest')
             .insert({ hex_q, hex_r, type, x, y, updated_at: new Date().toISOString() })
             .select()
@@ -134,7 +140,7 @@ router.put('/update-point', async (req, res) => {
     if (y !== undefined) updates.y = y;
 
     try {
-        const { data, error } = await supabase
+        const { data, error } = await req.supabase
             .from('points_of_interest')
             .update(updates)
             .eq('id', id)
@@ -165,7 +171,7 @@ router.post('/create-transition', async (req, res) => {
     }
 
     try {
-        const { data, error } = await supabase
+        const { data, error } = await req.supabase
             .from('point_transitions')
             .insert({ from_point_id, to_point_id })
             .select()
