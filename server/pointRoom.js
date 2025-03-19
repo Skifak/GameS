@@ -55,10 +55,7 @@ export class PointRoom extends Room {
 
         try {
             const { data: { user }, error } = await supabase.auth.getUser();
-            if (error) {
-                logger.error('Supabase auth error:', error.message, error);
-                throw new Error('Invalid token');
-            }
+            if (error) throw error;
             logger.info('User authenticated:', user.id);
 
             const { data: profile, error: profileError } = await supabase
@@ -66,10 +63,7 @@ export class PointRoom extends Room {
                 .select('*')
                 .eq('id', user.id)
                 .single();
-            if (profileError) {
-                logger.error('Profile fetch error:', profileError.message, profileError);
-                throw new Error(profileError.message);
-            }
+            if (profileError) throw profileError;
             logger.info('Profile loaded:', profile);
 
             if (profile.role === 'banned') {
@@ -89,14 +83,19 @@ export class PointRoom extends Room {
             logger.warn(`Player ${auth.profile.username} tried to join wrong room. Expected pointId: ${this.pointId}, got: ${options.pointId}`);
             throw new Error('Invalid pointId');
         }
-
-        logger.info(`Player ${auth.profile.username} joined PointRoom ${this.roomId} for point ${this.pointId}`);
+    
         this.state.players[client.sessionId] = {
             playerId: auth.user.id,
+            username: auth.profile.username,
             x: this.state.point?.x || 0,
             y: this.state.point?.y || 0
         };
+        logger.info(`Player ${auth.profile.username} joined PointRoom ${this.roomId} for point ${this.pointId}`);
         this.checkTransitions(client);
+    
+        // Явно отправляем состояние клиенту
+        logger.info('Broadcasting state:', this.state);
+        this.broadcast('state', this.state);
     }
 
     onMessage(client, message) {
