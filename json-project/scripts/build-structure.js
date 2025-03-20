@@ -58,7 +58,7 @@ async function parseStructure(dir) {
 
 async function main() {
   const dirs = ['src', 'server', 'supabase/migrations'];
-  const files = ['package.json', 'redis.conf', 'README.md'];
+  const files = ['package.json', 'redis.conf', 'README.md', 'game_readme.md'];
   await buildStructureJSON(dirs, files);
 }
 
