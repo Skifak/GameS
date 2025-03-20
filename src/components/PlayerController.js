@@ -10,7 +10,7 @@ export class PlayerController {
                 targets: this.player,
                 x: playerData.x,
                 y: playerData.y,
-                duration: 500,
+                duration: 1000, // Увеличиваем длительность до 1 секунды для плавности
                 ease: 'Linear',
                 onComplete: () => console.log('Player moved to:', playerData.x, playerData.y)
             });

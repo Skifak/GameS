@@ -1,48 +1,54 @@
 export class MessageHandler {
-    constructor(room, scene, onStateUpdate, onError, onDisconnect) {
-        this.room = room;
-        this.scene = scene;
-        this.onStateUpdate = onStateUpdate;
-        this.onError = onError;
-        this.onDisconnect = onDisconnect;
-        this.setupListeners();
+    constructor(room, gameStateManager, uiManager, onDisconnect, hexGrid) {
+      this.room = room;
+      this.gameStateManager = gameStateManager;
+      this.uiManager = uiManager;
+      this.onDisconnect = onDisconnect;
+      this.hexGrid = hexGrid; // Добавляем HexGrid
+      this.setupListeners();
     }
-
+  
     setupListeners() {
-        console.log('Setting up room listeners');
-
-        this.room.onStateChange((state) => {
-            console.log('State changed:', state);
-            const playerData = state.players.get(this.room.sessionId);
-            if (playerData) {
-                this.onStateUpdate(playerData, true);
-            }
+      this.room.onStateChange.once((state) => {
+        console.log('Initial state received:', state);
+        const playerData = state.players.get(this.room.sessionId);
+        if (playerData) {
+          this.gameStateManager.updatePlayerPosition(playerData.x, playerData.y, false);
+        }
+        // Инициализируем гексы и точки после получения состояния
+        this.hexGrid.initGrid().then(() => {
+          console.log('HexGrid initialized after state received');
+        }).catch(err => {
+          console.error('HexGrid init failed:', err);
         });
-
-        this.room.onMessage('joinNewRoom', (data) => {
-            console.log('Received joinNewRoom:', data);
-            this.room.leave();
-            this.scene.connectToNewRoom(data.pointId); // Переключаемся на новую комнату
-        });
-
-        this.room.onMessage('transitions', (data) => {
-            console.log('Available transitions:', data.available);
-        });
-
-        this.room.onMessage('error', (data) => {
-            console.error('Server error:', data.message);
-            this.onError(`Server error: ${data.message}`);
-        });
-
-        this.room.onError((code, message) => {
-            console.error('Room error:', code, message);
-            this.onError(`Connection error: ${message}`);
-            this.onDisconnect();
-        });
-
-        this.room.onLeave(() => {
-            console.log('Disconnected from room:', this.room?.roomId);
-            this.onDisconnect();
-        });
+      });
+  
+      this.room.onStateChange((state) => {
+        const playerData = state.players.get(this.room.sessionId);
+        if (playerData) {
+          this.gameStateManager.updatePlayerPosition(playerData.x, playerData.y, true);
+        }
+      });
+  
+      this.room.onMessage('joinNewRoom', (data) => {
+        this.gameStateManager.connectToPoint(data.pointId);
+      });
+  
+      this.room.onMessage('transitions', (data) => {
+        console.log('Available transitions:', data.available);
+      });
+  
+      this.room.onMessage('error', (data) => {
+        this.uiManager.setStatus(`Server error: ${data.message}`);
+      });
+  
+      this.room.onError((code, message) => {
+        this.uiManager.setStatus(`Connection error: ${message}`);
+        this.onDisconnect();
+      });
+  
+      this.room.onLeave(() => {
+        this.onDisconnect();
+      });
     }
-}
+  }
