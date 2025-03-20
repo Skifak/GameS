@@ -1,7 +1,3 @@
-/**
- * Управляет состоянием игры на клиенте, синхронизирует с сервером.
- * @module GameStateManager
- */
 import { EventBus } from './EventBus';
 import logger from '../utils/logger';
 
@@ -41,13 +37,29 @@ export class GameStateManager {
 
   async connectToPoint(pointId) {
     try {
+      if (this.room) {
+        await this.room.leave();
+        this.room = null;
+      }
       this.room = await this.connectionManager.connect(pointId);
       this.currentPoint = { id: pointId };
       EventBus.emit('connectionStatusChanged', 'Connected to Colyseus');
       logger.info(`Connected to point ${pointId}`);
+
+      return new Promise((resolve) => {
+        this.room.onStateChange.once((state) => {
+          const playerData = state.players.get(this.room.sessionId);
+          if (playerData) {
+            this.updatePlayerPosition(playerData.x, playerData.y, true);
+          }
+          console.log('New room state received:', state);
+          resolve();
+        });
+      });
     } catch (error) {
       EventBus.emit('connectionStatusChanged', `Failed to connect: ${error.message}`);
       logger.error(`Connection failed: ${error.message}`);
+      throw error;
     }
   }
 
@@ -64,7 +76,9 @@ export class GameStateManager {
       return;
     }
     try {
-      this.room.send({ type: 'moveToPoint', pointId });
+      const message = { type: 'moveToPoint', pointId: pointId };
+      console.log('Sending moveToPoint:', message);
+      this.room.send('moveToPoint', message); // Явно указываем тип
       logger.info(`Requested move to point ${pointId}`);
     } catch (error) {
       this.uiManager.setStatus(`Move failed: ${error.message}`);

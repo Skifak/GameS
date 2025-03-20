@@ -73,6 +73,15 @@ export class PointRoom extends Room {
     this.setState(new State());
     logger.info(`PointRoom created for point ${this.pointId}`);
     this.loadPointData();
+
+    this.onMessage('moveToPoint', (client, message) => {
+      logger.debug(`Received moveToPoint from ${client.sessionId}:`, message);
+      this.handleMoveToPoint(client, message.pointId);
+    });
+
+    this.onMessage('*', (client, type, message) => {
+      logger.warn(`Unhandled message type ${type} from ${client.sessionId}:`, message);
+    });
   }
 
   async loadPointData() {
@@ -115,7 +124,7 @@ export class PointRoom extends Room {
     if (profileError) throw profileError;
 
     if (profile.role === 'banned') throw new Error('User is banned');
-    return { user, profile };
+    return { user, profile, token: options.token }; // Сохраняем токен
   }
 
   async onJoin(client, options, auth) {
@@ -133,6 +142,8 @@ export class PointRoom extends Room {
     player.y = this.state.point.y || 0;
     this.state.players.set(client.sessionId, player);
 
+    client.auth = auth; // Сохраняем auth данные, включая токен
+
     await this.redisService.setPlayerSession(client.sessionId, {
       pointId: this.pointId,
       x: player.x,
@@ -142,7 +153,7 @@ export class PointRoom extends Room {
     });
 
     const supabase = createClient(this.supabaseUrl, this.anonKey, {
-      global: { headers: { Authorization: `Bearer ${client.auth.token}` } }
+      global: { headers: { Authorization: `Bearer ${auth.token}` } }
     });
     await supabase.from('profiles').update({ current_point_id: this.pointId }).eq('id', auth.user.id);
 
@@ -150,32 +161,17 @@ export class PointRoom extends Room {
     this.checkTransitions(client);
   }
 
-  onMessage(client, message) {
-    if (message.type === 'moveToPoint') {
-      this.handleMoveToPoint(client, message.pointId);
-    } else if (message.type === 'transition') {
-      this.handleTransition(client, message.toPointId);
-    } else if (message.type === 'click') {
-      const player = this.state.players.get(client.sessionId);
-      if (player) {
-        player.x = message.x;
-        player.y = message.y;
-        this.redisService.setPlayerSession(client.sessionId, {
-          pointId: this.state.point.id,
-          x: player.x,
-          y: player.y,
-          username: player.username,
-          status: 'active'
-        });
-        logger.info(`Player ${client.sessionId} clicked at (${message.x}, ${message.y})`);
-      }
-    }
-  }
-
   async handleMoveToPoint(client, pointId) {
+    if (this.state.point.id === pointId) {
+      logger.info(`Player ${client.sessionId} already at point ${pointId}, ignoring move`);
+      return;
+    }
+
+    logger.debug(`Auth token for ${client.sessionId}:`, client.auth?.token);
     const supabase = createClient(this.supabaseUrl, this.anonKey, {
-      global: { headers: { Authorization: `Bearer ${client.auth.token}` } }
+      global: { headers: { Authorization: `Bearer ${client.auth?.token || this.anonKey}` } }
     });
+
     try {
       const { data, error } = await supabase
         .from('points_of_interest')
@@ -185,7 +181,11 @@ export class PointRoom extends Room {
       if (error) throw new Error(error.message);
 
       const player = this.state.players.get(client.sessionId);
-      client.send('joinNewRoom', { pointId: data.id });
+      if (!player) {
+        logger.error(`Player ${client.sessionId} not found in room ${this.roomId}`);
+        return;
+      }
+
       await this.redisService.setPlayerSession(client.sessionId, {
         pointId: data.id,
         x: data.x,
@@ -194,7 +194,14 @@ export class PointRoom extends Room {
         status: 'active'
       });
       await supabase.from('profiles').update({ current_point_id: pointId }).eq('id', player.playerId);
+
+      client.send('playerMoved', { x: data.x, y: data.y });
+      logger.info(`Player ${player.playerId} moved to point ${pointId} at (${data.x}, ${data.y})`);
+
+      client.send('joinNewRoom', { pointId: data.id });
+      client.leave();
       this.state.players.delete(client.sessionId);
+
       logger.info(`Player ${player.playerId} requested move to point ${pointId}`);
     } catch (error) {
       logger.error(`Move to point ${pointId} failed: ${error.message}`);
@@ -203,9 +210,16 @@ export class PointRoom extends Room {
   }
 
   async handleTransition(client, toPointId) {
+    if (this.state.point.id === toPointId) {
+      logger.info(`Player ${client.sessionId} already at point ${toPointId}, ignoring transition`);
+      return;
+    }
+
+    logger.debug(`Auth token for ${client.sessionId}:`, client.auth?.token);
     const supabase = createClient(this.supabaseUrl, this.anonKey, {
-      global: { headers: { Authorization: `Bearer ${client.auth.token}` } }
+      global: { headers: { Authorization: `Bearer ${client.auth?.token || this.anonKey}` } }
     });
+
     try {
       const { data, error } = await supabase
         .from('point_transitions')
@@ -223,7 +237,11 @@ export class PointRoom extends Room {
       if (pointError) throw new Error(pointError.message);
 
       const player = this.state.players.get(client.sessionId);
-      client.send('joinNewRoom', { pointId: toPointId });
+      if (!player) {
+        logger.error(`Player ${client.sessionId} not found in room ${this.roomId}`);
+        return;
+      }
+
       await this.redisService.setPlayerSession(client.sessionId, {
         pointId: toPointId,
         x: newPoint.x,
@@ -232,7 +250,14 @@ export class PointRoom extends Room {
         status: 'active'
       });
       await supabase.from('profiles').update({ current_point_id: toPointId }).eq('id', player.playerId);
+
+      client.send('playerMoved', { x: newPoint.x, y: newPoint.y });
+      logger.info(`Player ${player.playerId} transitioned to point ${toPointId} at (${newPoint.x}, ${newPoint.y})`);
+
+      client.send('joinNewRoom', { pointId: toPointId });
+      client.leave();
       this.state.players.delete(client.sessionId);
+
       logger.info(`Player ${player.playerId} transitioned to point ${toPointId}`);
     } catch (error) {
       logger.error(`Transition to point ${toPointId} failed: ${error.message}`);
@@ -247,7 +272,7 @@ export class PointRoom extends Room {
     }
 
     const supabase = createClient(this.supabaseUrl, this.anonKey, {
-      global: { headers: { Authorization: `Bearer ${client.auth.token}` } }
+      global: { headers: { Authorization: `Bearer ${client.auth?.token || this.anonKey}` } }
     });
     try {
       const { data, error } = await supabase

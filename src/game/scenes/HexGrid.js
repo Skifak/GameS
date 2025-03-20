@@ -15,7 +15,9 @@ export class HexGrid {
   }
 
   async initGrid() {
+    console.log('Room state:', this.room.state);
     const currentPoint = this.mapDataManager.getPoint(this.room.state.point.id);
+    console.log('Current point:', currentPoint);
     if (!currentPoint) {
       console.error('Current point not found in cache:', this.room.state.point.id);
       return;
@@ -29,17 +31,25 @@ export class HexGrid {
   }
 
   updatePoints(q, r) {
+    console.log('Updating points for hex:', q, r);
     this.pointsGroup.clear(true, true);
     this.renderedPoints.clear();
     this.drawPointsInHex(q, r);
+    console.log('Points updated, hexes:', this.hexGroup.getChildren().length, 'points:', this.pointsGroup.getChildren().length);
   }
 
   drawHexIfNeeded(q, r) {
     const key = `${q}:${r}`;
-    if (this.renderedHexes.has(key)) return;
+    if (this.renderedHexes.has(key)) {
+      console.log('Hex already rendered:', key);
+      return;
+    }
 
     const hex = this.mapDataManager.getHex(q, r);
-    if (!hex) return;
+    if (!hex) {
+      console.warn('Hex not found in cache:', q, r);
+      return;
+    }
 
     const hexWidth = this.hexSize * Math.sqrt(3);
     const hexHeight = this.hexSize * 2;
@@ -67,12 +77,17 @@ export class HexGrid {
     this.hexGroup.add(hexObj);
     hexObj.setDepth(1);
     this.renderedHexes.add(key);
+    console.log('Hex drawn:', key, 'at', x, y);
   }
 
   drawPointsInHex(q, r) {
     const points = this.mapDataManager.getPointsInHex(q, r);
+    console.log('Points in hex', q, r, ':', points);
     points.forEach(point => {
-      if (this.renderedPoints.has(point.id)) return;
+      if (this.renderedPoints.has(point.id)) {
+        console.log('Point already rendered:', point.id);
+        return;
+      }
 
       const typeColors = {
         camp: 0x4B712E,
@@ -89,21 +104,28 @@ export class HexGrid {
       this.pointsGroup.add(circle);
       circle.setDepth(2);
       this.renderedPoints.add(point.id);
+      console.log('Point drawn:', point.id, 'at', point.x, point.y);
     });
   }
 
   handlePointClick(pointId) {
-    if (this.room.state.point.id === pointId) return;
+    console.log('Point clicked:', pointId);
     EventBus.emit('moveToPointRequested', pointId);
   }
 
   updateRoom(room) {
     this.room = room;
+    console.log('Updating room:', room.roomId, 'state:', room.state);
     if (!room.state || !room.state.point || !room.state.point.id) {
+      console.error('Room state not fully initialized yet:', room.state);
       room.onStateChange.once(state => this.updateRoom(room));
       return;
     }
     const currentPoint = this.mapDataManager.getPoint(this.room.state.point.id);
-    if (currentPoint) this.updatePoints(currentPoint.hex_q, currentPoint.hex_r);
+    if (currentPoint) {
+      this.updatePoints(currentPoint.hex_q, currentPoint.hex_r);
+    } else {
+      console.error('Point not found for room:', room.roomId);
+    }
   }
 }
