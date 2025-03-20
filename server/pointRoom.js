@@ -1,6 +1,62 @@
 import { Room } from 'colyseus';
+import { Schema, defineTypes } from '@colyseus/schema';
 import { createClient } from '@supabase/supabase-js';
 import logger from './logger.js';
+
+// Определяем класс Player
+class Player extends Schema {
+    constructor() {
+        super();
+        this.playerId = "";
+        this.username = "";
+        this.x = 0;
+        this.y = 0;
+    }
+}
+
+// Определяем класс Point
+class Point extends Schema {
+    constructor() {
+        super();
+        this.id = 0;
+        this.hex_q = 0;
+        this.hex_r = 0;
+        this.type = "";
+        this.x = 0;
+        this.y = 0;
+    }
+}
+
+// Определяем класс State
+class State extends Schema {
+    constructor() {
+        super();
+        this.players = new Map();
+        this.point = new Point();
+    }
+}
+
+// Определяем типы для схем
+defineTypes(Player, {
+    playerId: "string",
+    username: "string",
+    x: "number",
+    y: "number"
+});
+
+defineTypes(Point, {
+    id: "number",
+    hex_q: "number",
+    hex_r: "number",
+    type: "string",
+    x: "number",
+    y: "number"
+});
+
+defineTypes(State, {
+    players: { map: Player },
+    point: Point
+});
 
 export class PointRoom extends Room {
     constructor() {
@@ -16,7 +72,9 @@ export class PointRoom extends Room {
         this.anonKey = options.anonKey;
         this.pointId = options.pointId;
         this.maxClients = 10;
-        this.setState({ players: {}, point: null });
+
+        // Устанавливаем начальное состояние через схему
+        this.setState(new State());
         logger.info(`PointRoom created for point ${this.pointId}`);
         console.log('State initialized:', this.state);
         this.loadPointData();
@@ -32,7 +90,15 @@ export class PointRoom extends Room {
                 .eq('id', this.pointId)
                 .single();
             if (error) throw error;
-            this.state.point = data;
+
+            // Обновляем состояние точки
+            this.state.point.id = data.id;
+            this.state.point.hex_q = data.hex_q;
+            this.state.point.hex_r = data.hex_r;
+            this.state.point.type = data.type;
+            this.state.point.x = data.x;
+            this.state.point.y = data.y;
+
             logger.info(`Point ${this.pointId} loaded:`, data);
             console.log('Point data loaded:', data);
         } catch (error) {
@@ -96,25 +162,22 @@ export class PointRoom extends Room {
             console.warn('Wrong pointId, expected:', this.pointId, 'got:', options.pointId);
             throw new Error('Invalid pointId');
         }
-    
-        if (!this.state.point) {
+
+        if (!this.state.point.id) {
             console.log('Waiting for point data to load...');
             await this.loadPointData();
         }
-    
-        this.state.players[client.sessionId] = {
-            playerId: auth.user.id,
-            username: auth.profile.username,
-            x: this.state.point?.x || 0,
-            y: this.state.point?.y || 0
-        };
+
+        const player = new Player();
+        player.playerId = auth.user.id;
+        player.username = auth.profile.username;
+        player.x = this.state.point.x || 0;
+        player.y = this.state.point.y || 0;
+        this.state.players.set(client.sessionId, player);
+
         logger.info(`Player ${auth.profile.username} joined PointRoom ${this.roomId} for point ${this.pointId}`);
-        console.log('Player added to state:', this.state.players[client.sessionId]);
+        console.log('Player added to state:', this.state.players.get(client.sessionId));
         this.checkTransitions(client);
-    
-        logger.info('Broadcasting state:', this.state);
-        console.log('Broadcasting state to all clients:', this.state);
-        this.broadcast('state', this.state);
         console.log('onJoin finished');
     }
 
@@ -128,12 +191,16 @@ export class PointRoom extends Room {
             this.handleTransition(client, message.toPointId);
         } else if (message.type === 'click') {
             console.log('Handling click at x:', message.x, 'y:', message.y);
-            if (!this.state.players[client.sessionId]) {
-                this.state.players[client.sessionId] = { x: message.x, y: message.y };
+            const player = this.state.players.get(client.sessionId);
+            if (!player) {
+                const newPlayer = new Player();
+                newPlayer.x = message.x;
+                newPlayer.y = message.y;
+                this.state.players.set(client.sessionId, newPlayer);
                 console.log('New player position set:', message.x, message.y);
             } else {
-                this.state.players[client.sessionId].x = message.x;
-                this.state.players[client.sessionId].y = message.y;
+                player.x = message.x;
+                player.y = message.y;
                 console.log('Player position updated:', message.x, message.y);
             }
             logger.info(`Player ${client.sessionId} clicked at (${message.x}, ${message.y})`);
@@ -156,22 +223,15 @@ export class PointRoom extends Room {
                 .single();
             if (error) throw new Error(error.message);
             console.log('Point data fetched:', data);
-    
-            const player = this.state.players[client.sessionId];
-            const currentPoint = this.state.point;
-            console.log('Current point:', currentPoint, 'Target point:', data);
-            if (data.hex_q === currentPoint.hex_q && data.hex_r === currentPoint.hex_r) {
-                player.x = data.x;
-                player.y = data.y;
-                logger.info(`Player ${player.playerId} moved to point ${pointId}`);
-                console.log('Player moved to:', player.x, player.y);
-                this.checkTransitions(client);
-                this.broadcast('state', this.state); // Убедимся, что состояние отправляется
-            } else {
-                logger.warn(`Point ${pointId} is not in the same hex as ${this.pointId}`);
-                console.warn('Point not in same hex, no movement');
-                client.send('error', { message: `Point ${pointId} is not in the same hex` });
-            }
+
+            const player = this.state.players.get(client.sessionId);
+            console.log('Current point:', this.state.point, 'Target point:', data);
+
+            // Всегда отправляем joinNewRoom для новой точки
+            logger.info(`Player ${player.playerId} requested move to point ${pointId}`);
+            console.log('Sending joinNewRoom to client for pointId:', pointId);
+            client.send('joinNewRoom', { pointId: data.id });
+            this.state.players.delete(client.sessionId); // Удаляем игрока из текущей комнаты
         } catch (error) {
             logger.error(`Move to point ${pointId} failed: ${error.message}`);
             console.error('Move failed:', error.message);
@@ -205,10 +265,10 @@ export class PointRoom extends Room {
             if (pointError) throw new Error(pointError.message);
             console.log('New point data:', newPoint);
 
-            const player = this.state.players[client.sessionId];
+            const player = this.state.players.get(client.sessionId);
             console.log('Sending joinNewRoom to client');
             client.send('joinNewRoom', { pointId: toPointId });
-            delete this.state.players[client.sessionId];
+            this.state.players.delete(client.sessionId);
             logger.info(`Player ${player.playerId} transitioned to point ${toPointId}`);
             console.log('Player removed from state:', this.state.players);
         } catch (error) {
@@ -222,7 +282,7 @@ export class PointRoom extends Room {
 
     async checkTransitions(client) {
         console.log('checkTransitions started for client:', client.sessionId);
-        if (this.state.point?.type !== 'transition') {
+        if (this.state.point.type !== 'transition') {
             console.log('Not a transition point, sending empty transitions');
             client.send('transitions', { available: [] });
             return;
@@ -251,11 +311,11 @@ export class PointRoom extends Room {
 
     async onLeave(client, consented) {
         console.log('onLeave started for client:', client.sessionId, 'consented:', consented);
-        const player = this.state.players[client.sessionId];
+        const player = this.state.players.get(client.sessionId);
         if (player) {
             logger.info(`Player ${player.playerId} left PointRoom ${this.roomId}`);
             console.log('Player leaving:', player);
-            delete this.state.players[client.sessionId];
+            this.state.players.delete(client.sessionId);
             console.log('Player removed from state:', this.state.players);
         }
         console.log('onLeave finished');

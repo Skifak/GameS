@@ -40,9 +40,14 @@ async function initRedis() {
     }
     redisClient = createClient({ url: config.redisUrl });
     redisClient.on("error", (err) => logger.error("Redis Client Error", err));
+    redisClient.on("connect", () => logger.info("Connected to Redis at " + config.redisUrl));
     try {
         await redisClient.connect();
-        logger.info("Connected to Redis");
+        logger.info("Redis connection established");
+        // Тестовая запись
+        await redisClient.set('test_key', 'Redis works!');
+        const testValue = await redisClient.get('test_key');
+        logger.info("Redis test value: " + testValue);
     } catch (err) {
         logger.error("Failed to connect to Redis", err);
         redisClient = null;

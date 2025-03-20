@@ -307,6 +307,37 @@ CORS на сервере:
 В connectToRoom используется фиксированный pointId: 1. Если точки с таким ID нет в базе, это может привести к ошибкам.
 Рекомендация: Динамически загружайте доступные точки или добавьте обработку ошибок.
 
+
+---
+### Разделение Game.js на компоненты
+
+1. ConnectionManager (src/game/ConnectionManager.js)
+Задача: Управление подключением к Colyseus (соединение, переподключение, ошибки).
+Что переносим: Логика из connectToRoom, включая работу с Supabase и создание комнаты.
+Папка: src/game, так как это часть игровой логики.
+2. MessageHandler (src/game/MessageHandler.js)
+Задача: Обработка сообщений и событий от сервера (onMessage, onStateChange, onLeave, onError).
+Что переносим: Логика из setupRoomListeners.
+Папка: src/game, так как это обработка игровой сетевой логики.
+3. CommandSender (src/game/CommandSender.js)
+Задача: Отправка команд на сервер (например, moveToPoint).
+Что переносим: Обработчик EventBus.on('moveToPoint', ...).
+Папка: src/game, так как это игровые команды.
+4. PlayerController (src/components/PlayerController.js)
+Задача: Управление объектом игрока (позиция, анимация).
+Что переносим: Создание и обновление this.player (круг), логика движения из onStateChange и onMessage('state').
+Папка: src/components, так как это визуальный Phaser-объект.
+5. UIManager (src/components/UIManager.js)
+Задача: Управление UI (текст статуса).
+Что переносим: Создание и обновление this.statusText.
+Папка: src/components, так как это UI-элемент.
+6. HexGrid (src/game/HexGrid.js)
+Задача: Отрисовка сетки и точек интереса.
+Что переносим: Уже существует, просто интегрируем.
+Папка: Остаётся в src/game.
+7. Game (src/game/Game.js)
+Задача: Сборка всех компонентов в сцену Phaser, управление жизненным циклом.
+Что остаётся: preload, базовая настройка камеры, сборка компонентов в create.
 ---
 # Supabase
    Обзор сервисов Supabase

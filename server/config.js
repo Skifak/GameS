@@ -58,27 +58,22 @@ const isDocker = process.env.DOCKER_ENV === 'true';
  */
 const getServiceUrl = (envVar, dockerUrl, localPort) => {
   const envValue = process.env[envVar];
-  if (envValue) return envValue;
+  if (envValue) {
+    console.log(`Using ${envVar} from .env: ${envValue}`);
+    return envValue;
+  }
   
-  // Для локальной разработки используем localhost с соответствующим портом
   if (isLocalDev && !isDocker) {
+    console.log(`Local dev mode: using localhost:${localPort}`);
     return `${dockerUrl.split('://')[0]}://localhost:${localPort}`;
   }
   
-  // Для Docker контейнера используем имена сервисов из docker-compose
   if (isDocker) {
-    // Извлекаем хост из URL (например, redis из redis://redis:6379)
-    const host = new URL(dockerUrl).hostname;
-    // Проверяем доступность хоста через DNS
-    try {
-      // Если хост недоступен, используем localhost
-      return dockerUrl;
-    } catch (error) {
-      console.warn(`Service ${host} is not available, using fallback`);
-      return `${dockerUrl.split('://')[0]}://localhost:${localPort}`;
-    }
+    console.log(`Docker mode: using ${dockerUrl}`);
+    return dockerUrl;
   }
   
+  console.log(`Default mode: using ${dockerUrl}`);
   return dockerUrl;
 };
 
@@ -88,14 +83,18 @@ const getServiceUrl = (envVar, dockerUrl, localPort) => {
  */
 const baseConfig = {
   port: process.env.PORT || 2567,
-  redisUrl: getServiceUrl('REDIS_URL', 'redis://redis:6379', 6379),
+  //для докер окружения:
+  //  redisUrl: process.env.REDIS_URL || (isLocalDev && !isDocker ? 'redis://localhost:6379' : 'redis://redis:6379'),
+  redisUrl: 'redis://localhost:6379', // Временно форсируем для теста
   natsUrl: getServiceUrl('NATS_URL', 'nats://nats:4222', 4222),
   jwtSecret: process.env.JWT_SECRET || 'dev-secret-key-do-not-use-in-production',
   logDir: path.join(__dirname, '../logs'),
   isLocalDev,
   isDocker
 };
-
+// Добавь это сразу после baseConfig
+console.log('process.env.REDIS_URL:', process.env.REDIS_URL);
+console.log('Final redisUrl:', baseConfig.redisUrl);
 /**
  * Конфигурации для разных сред (development и production).
  * @type {Object}
@@ -111,7 +110,7 @@ const envConfig = {
       allowedHeaders: ['Content-Type', 'Authorization']
     },
     // Флаги для обработки недоступных сервисов в режиме разработки
-    allowMissingRedis: true,
+    allowMissingRedis: false,
     allowMissingNats: true,
     allowMissingLoki: true,
     mockAuthInDev: true
