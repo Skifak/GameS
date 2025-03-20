@@ -65,6 +65,12 @@ else
 endif
 
 # Запуск фронтенда через Vite
+.PHONY: ii                # Объявляем dev как "phony"
+ii:                       # Запускает фронтенд через Vite для локальной разработки
+	$(NPM) run build:path 
+	-$(NPM) run build:code 
+
+# Запуск фронтенда через Vite
 .PHONY: dev                # Объявляем dev как "phony"
 dev:                       # Запускает фронтенд через Vite для локальной разработки
 	$(NPM) run dev
