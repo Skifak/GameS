@@ -1,34 +1,25 @@
-/**
- * Главный файл для инициализации игры Phaser.
- * Определяет конфигурацию и запускает игру с указанной сценой.
- * @module PhaserMain
- */
-
 import Phaser from "phaser";
 import { Game } from "./scenes/Game";
+import RexBoardPlugin from 'phaser3-rex-plugins/plugins/board-plugin.js';
 
-/**
- * Конфигурация игры Phaser.
- * @type {Object}
- */
 const config = {
-    type: Phaser.AUTO,
-    parent: "game-container",
-    backgroundColor: "#000000",
-    scale: {
-        mode: Phaser.Scale.FIT,
-        autoCenter: Phaser.Scale.CENTER_BOTH,
-        width: window.innerWidth - 20, // Учитываем border 10px с каждой стороны
-        height: window.innerHeight - 20,
-    },
-    scene: [Game],
+  type: Phaser.AUTO,
+  parent: "game-container",
+  backgroundColor: "#000000",
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: window.innerWidth - 20,
+    height: window.innerHeight - 20,
+  },
+  scene: [Game],
+  plugins: {
+    scene: [
+      { key: 'rexBoard', plugin: RexBoardPlugin, mapping: 'rexBoard' }
+    ]
+  }
 };
 
-/**
- * Запускает игру Phaser с заданным родительским элементом.
- * @param {string} parent - ID родительского HTML-элемента
- * @returns {Phaser.Game} Экземпляр игры Phaser
- */
 export default function StartGame(parent) {
-    return new Phaser.Game({ ...config, parent });
+  return new Phaser.Game({ ...config, parent });
 }

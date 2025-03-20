@@ -1,14 +1,12 @@
+import { Scene } from 'phaser';
 import { EventBus } from '../EventBus';
 import { supabase } from '../../lib/supabase';
-import { Scene } from 'phaser';
 import { ConnectionManager } from '../ConnectionManager';
-import { MessageHandler } from '../MessageHandler';
-import { PlayerController } from '../../components/PlayerController';
-import { UIManager } from '../../components/UIManager';
-import { HexGrid } from './HexGrid';
 import { MapDataManager } from '../MapDataManager';
 import { GameStateManager } from '../GameStateManager';
-import { toast } from 'react-toastify';
+import { MessageHandler } from '../MessageHandler';
+import { PlayerController } from '../../components/PlayerController';
+import { HexGrid } from './HexGrid';
 
 export class Game extends Scene {
   constructor() {
@@ -17,11 +15,8 @@ export class Game extends Scene {
     this.connectionManager = new ConnectionManager(this.supabase);
     this.mapDataManager = new MapDataManager();
     this.playerController = null;
-    this.uiManager = null;
     this.hexGrid = null;
     this.gameStateManager = null;
-    this.supabaseUrl = 'http://127.0.0.1:54321';
-    this.anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
   }
 
   preload() {
@@ -52,25 +47,25 @@ export class Game extends Scene {
       this.cameras.main.setZoom(Math.max(0.5, Math.min(2, newZoom)));
     });
 
-    this.uiManager = new UIManager(this);
     await this.mapDataManager.loadData();
 
     this.gameStateManager = new GameStateManager(
       this.connectionManager,
       this.playerController,
-      this.uiManager,
+      null,
       this.supabase
     );
     await this.gameStateManager.init();
 
     this.hexGrid = new HexGrid(this, this.connectionManager.getRoom(), this.mapDataManager);
+    await this.hexGrid.initGrid();
 
     new MessageHandler(
       this.connectionManager.getRoom(),
       this.gameStateManager,
-      this.uiManager,
+      null,
       () => this.connectionManager.reconnect(),
-      this.hexGrid // Передаём HexGrid для инициализации
+      this.hexGrid
     );
 
     EventBus.emit('current-scene-ready', this);

@@ -1,131 +1,102 @@
-import Phaser from 'phaser';
 import { EventBus } from '../EventBus';
+import logger from '../../utils/logger';
 
 export class HexGrid {
   constructor(scene, room, mapDataManager) {
     this.scene = scene;
     this.room = room;
     this.mapDataManager = mapDataManager;
-    this.hexSize = 117;
+    this.hexSize = 100;
+    this.board = null;
     this.hexGroup = this.scene.add.group();
-    this.pointsGroup = this.scene.add.group();
-    this.renderedHexes = new Set();
-    this.renderedPoints = new Set();
-    console.log('HexGrid constructed');
+    this.marker = null;
+  }
+
+  clearGrid() {
+    if (this.board) {
+      this.board.destroy();
+    }
+    this.hexGroup.clear(true, true);
+    if (this.marker) {
+      this.marker.destroy();
+    }
   }
 
   async initGrid() {
-    console.log('Room state:', this.room.state);
-    const currentPoint = this.mapDataManager.getPoint(this.room.state.point.id);
-    console.log('Current point:', currentPoint);
-    if (!currentPoint) {
-      console.error('Current point not found in cache:', this.room.state.point.id);
+    this.clearGrid();
+
+    if (!this.scene.rexBoard) {
+      logger.error('rexBoard plugin is not initialized');
       return;
     }
 
-    this.mapDataManager.hexes.forEach(hex => {
-      this.drawHexIfNeeded(hex.q, hex.r);
+    // Создаем доску
+    this.board = this.scene.rexBoard.add.board({
+      grid: {
+        gridType: 'hexagonGrid',
+        x: 500, // Смещаем центр карты для видимости
+        y: 500,
+        size: this.hexSize,
+        staggeraxis: 'y',
+        staggerindex: 'odd'
+      },
+      width: 20,
+      height: 20
     });
 
-    this.updatePoints(currentPoint.hex_q, currentPoint.hex_r);
-  }
+    // Загружаем и рисуем гексы
+    const hexes = this.mapDataManager.getHexes();
+    hexes.forEach(hex => {
+      const tileXY = { x: hex.q, y: hex.r };
+      const worldXY = this.board.tileXYToWorldXY(tileXY.x, tileXY.y);
 
-  updatePoints(q, r) {
-    console.log('Updating points for hex:', q, r);
-    this.pointsGroup.clear(true, true);
-    this.renderedPoints.clear();
-    this.drawPointsInHex(q, r);
-    console.log('Points updated, hexes:', this.hexGroup.getChildren().length, 'points:', this.pointsGroup.getChildren().length);
-  }
-
-  drawHexIfNeeded(q, r) {
-    const key = `${q}:${r}`;
-    if (this.renderedHexes.has(key)) {
-      console.log('Hex already rendered:', key);
-      return;
-    }
-
-    const hex = this.mapDataManager.getHex(q, r);
-    if (!hex) {
-      console.warn('Hex not found in cache:', q, r);
-      return;
-    }
-
-    const hexWidth = this.hexSize * Math.sqrt(3);
-    const hexHeight = this.hexSize * 2;
-    const x = hexWidth * (q + (r % 2) * 0.5) + 10;
-    const y = hexHeight * 0.75 * r + 45;
-
-    const colors = {
-      neutral: 0xaaaaaa,
-      free: 0x00ff00,
-      danger: 0xff0000,
-      controlled: 0x0000ff
-    };
-
-    const points = [
-      0, -this.hexSize,
-      this.hexSize * Math.sqrt(3) / 2, -this.hexSize / 2,
-      this.hexSize * Math.sqrt(3) / 2, this.hexSize / 2,
-      0, this.hexSize,
-      -this.hexSize * Math.sqrt(3) / 2, this.hexSize / 2,
-      -this.hexSize * Math.sqrt(3) / 2, -this.hexSize / 2
-    ];
-
-    const hexObj = this.scene.add.polygon(x, y, points, colors[hex.type] || 0xaaaaaa, 0.7);
-    hexObj.setData({ q, r, type: hex.type });
-    this.hexGroup.add(hexObj);
-    hexObj.setDepth(1);
-    this.renderedHexes.add(key);
-    console.log('Hex drawn:', key, 'at', x, y);
-  }
-
-  drawPointsInHex(q, r) {
-    const points = this.mapDataManager.getPointsInHex(q, r);
-    console.log('Points in hex', q, r, ':', points);
-    points.forEach(point => {
-      if (this.renderedPoints.has(point.id)) {
-        console.log('Point already rendered:', point.id);
-        return;
+      const graphics = this.scene.add.graphics();
+      graphics.lineStyle(2, 0x00ff00);
+      const polygon = this.board.getGridPoints(tileXY.x, tileXY.y, true);
+      graphics.beginPath();
+      graphics.moveTo(polygon[0].x, polygon[0].y);
+      for (let i = 1; i < polygon.length; i++) {
+        graphics.lineTo(polygon[i].x, polygon[i].y);
       }
+      graphics.closePath();
+      graphics.strokePath();
 
-      const typeColors = {
-        camp: 0x4B712E,
-        transition: 0xffcf5b,
-        normal: 0xaaaaaa,
-        anomaly: 0xff0000,
-        faction: 0x0000ff
-      };
+      // Делаем гекс интерактивным
+      graphics.setInteractive(new Phaser.Geom.Polygon(polygon), Phaser.Geom.Polygon.Contains);
+      graphics.on('pointerdown', () => this.handleHexClick(hex.q, hex.r));
+      this.hexGroup.add(graphics);
 
-      const circle = this.scene.add.circle(point.x, point.y, 10, typeColors[point.type] || 0xaaaaaa, 0.7);
-      circle.setInteractive();
-      circle.on('pointerdown', () => this.handlePointClick(point.id));
-      circle.setData({ id: point.id, type: point.type, hex_q: point.hex_q, hex_r: point.hex_r });
-      this.pointsGroup.add(circle);
-      circle.setDepth(2);
-      this.renderedPoints.add(point.id);
-      console.log('Point drawn:', point.id, 'at', point.x, point.y);
+      logger.info(`Hex drawn at q:${hex.q}, r:${hex.r}, worldX:${worldXY.x}, worldY:${worldXY.y}`);
     });
+
+    this.updateMarker();
   }
 
-  handlePointClick(pointId) {
-    console.log('Point clicked:', pointId);
-    EventBus.emit('moveToPointRequested', pointId);
+  updateMarker() {
+    if (!this.room || !this.room.state || !this.room.state.players || !this.board) {
+      logger.warn('Room state or board not ready for marker update');
+      return;
+    }
+
+    const playerData = this.room.state.players.get(this.room.sessionId);
+    if (playerData) {
+      const worldXY = this.board.tileXYToWorldXY(playerData.q, playerData.r);
+      if (this.marker) {
+        this.marker.setPosition(worldXY.x, worldXY.y);
+      } else {
+        this.marker = this.scene.add.circle(worldXY.x, worldXY.y, 10, 0xffcf5b).setDepth(2);
+      }
+      logger.info(`Marker updated to q:${playerData.q}, r:${playerData.r}, worldX:${worldXY.x}, worldY:${worldXY.y}`);
+    }
+  }
+
+  handleHexClick(q, r) {
+    logger.info(`Hex clicked: q:${q}, r:${r}`);
+    this.room.send('moveToHex', { q, r });
   }
 
   updateRoom(room) {
     this.room = room;
-    console.log('Updating room:', room.roomId, 'state:', room.state);
-    if (!room.state || !room.state.point || !room.state.point.id) {
-      console.error('Room state not fully initialized yet:', room.state);
-      room.onStateChange.once(state => this.updateRoom(room));
-      return;
-    }
-    const currentPoint = this.mapDataManager.getPoint(this.room.state.point.id);
-    if (currentPoint) {
-      this.updatePoints(currentPoint.hex_q, currentPoint.hex_r);
-    } else {
-      console.error('Point not found for room:', room.roomId);
-    }
+    this.updateMarker();
   }
 }
