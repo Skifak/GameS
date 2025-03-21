@@ -7,7 +7,7 @@ export class GameStateManager {
     this.playerController = playerController;
     this.uiManager = uiManager;
     this.supabase = supabase;
-    this.player = { id: null, username: null, q: 0, r: 0 }; // Заменяем x, y на q, r
+    this.player = { id: null, username: null, q: 0, r: 0 };
     this.room = null;
     this.setupListeners();
   }
@@ -22,6 +22,19 @@ export class GameStateManager {
     if (session) {
       this.player.id = session.user.id;
       this.player.username = session.user.user_metadata.username || 'Unknown';
+
+      // Загружаем текущую позицию из profiles
+      const { data: profile, error } = await this.supabase
+        .from('profiles')
+        .select('current_hex_q, current_hex_r')
+        .eq('id', this.player.id)
+        .single();
+      if (error) {
+        logger.error(`Failed to load profile: ${error.message}`);
+      } else {
+        this.player.q = profile.current_hex_q || 0;
+        this.player.r = profile.current_hex_r || 0;
+      }
     }
 
     await this.connectToPoint();
@@ -33,7 +46,7 @@ export class GameStateManager {
         await this.room.leave();
         this.room = null;
       }
-      this.room = await this.connectionManager.connect(1); // Используем фиктивный pointId, так как точки убраны
+      this.room = await this.connectionManager.connect(1);
       EventBus.emit('connectionStatusChanged', 'Connected to Colyseus');
       logger.info(`Connected to room`);
 
@@ -56,12 +69,11 @@ export class GameStateManager {
   updatePlayerPosition(q, r, useTween = false) {
     this.player.q = q;
     this.player.r = r;
-    this.playerController.updatePosition({ q, r }, useTween); // Передаем q, r вместо x, y
+    this.playerController.updatePosition({ q, r }, useTween);
     logger.info(`Player position updated to q:${q}, r:${r}`);
   }
 
   async moveToPoint(pointId) {
-    // Убираем эту функцию, так как точки интереса не используются
     logger.warn('moveToPoint is not used in MVP');
   }
 }
