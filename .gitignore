@@ -41,6 +41,9 @@ logs
 node_modules
 .cursor
 .vscode
+project-code.min.json
+project-structure.min.json
+
 
 # Testing
 coverage
