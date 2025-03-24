@@ -12,24 +12,27 @@
 #### Этап 1: Подготовка инфраструктуры
 - **Цель**: Подготовить проект, базу данных и структуру для разработки.
 - **Подзадачи**:
-  1. **Установка зависимостей**:
+  1. **Установка зависимостей**: - выполнено
      - Установить React DnD: `npm install react-dnd react-dnd-html5-backend`.
      - Проверить наличие `phaser3-rex-plugins`, Phaser.js, Colyseus, Supabase в `package.json`.
-  2. **Обновление базы данных**:
+  2. **Обновление базы данных**: - выполнено
      - Создать миграцию `supabase/migrations/20250323120001_add_energy_to_profiles.sql`:
        ```sql
        ALTER TABLE profiles ADD COLUMN energy INTEGER DEFAULT 100;
        CREATE INDEX idx_profiles_energy ON profiles(energy);
        ```
-     - Обновить миграцию `supabase/migrations/20250316190346_create_point_transitions.sql`:
-       - Добавить поле `is_bidirectional BOOLEAN DEFAULT FALSE` для двухсторонних связей.
-  3. **Создание файлов визуализации**:
-     - `src/game/scenes/Point.js` — рендеринг и логика точек.
-     - `src/game/scenes/Path.js` — рендеринг и логика путей.
-     - Адаптировать `src/game/scenes/HexGrid.js` под новые требования.
+     - Cоздать миграцию `20250323120002_add_bidirectional_to_point_transitions.sql`:
+       ```sql
+       ALTER TABLE point_transitions
+       ADD COLUMN is_bidirectional BOOLEAN DEFAULT FALSE;
+       CREATE INDEX idx_point_transitions_bidirectional ON point_transitions (is_bidirectional);
+       ```
+  3. **Создание файлов визуализации**: - выполнено
+     - `src/game/scenes/Point.js` — рендеринг и логика точек. - выполнено
+     - `src/game/scenes/Path.js` — рендеринг и логика путей. - выполнено
   4. **Создание ветки**:
-     - `git checkout -b feature/movement-and-map-editor`.
-- **Файлы**:
+     - `git checkout -b feature/movement-and-map-editor`. - выполнено
+- **Файлы**: - выполнено
   - `package.json`.
   - `supabase/migrations/20250323120001_add_energy_to_profiles.sql`.
   - `supabase/migrations/20250316190346_create_point_transitions.sql` (обновление).
