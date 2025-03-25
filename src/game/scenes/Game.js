@@ -1,3 +1,8 @@
+/**
+ * Главная сцена игры Phaser.
+ * Инициализирует игровые менеджеры и отображает карту.
+ * @module GameScene
+ */
 import { Scene } from 'phaser';
 import { EventBus } from '../EventBus';
 import { supabase } from '../../lib/supabase';
@@ -8,6 +13,11 @@ import { MessageHandler } from '../MessageHandler';
 import { PlayerController } from '../../components/PlayerController';
 import { HexGrid } from './HexGrid';
 
+/**
+ * Главная сцена игры.
+ * @class
+ * @extends Phaser.Scene
+ */
 export class Game extends Scene {
   constructor() {
     super('Game');
@@ -19,10 +29,17 @@ export class Game extends Scene {
     this.gameStateManager = null;
   }
 
+  /**
+   * Загружает ресурсы перед созданием сцены. Сейчас загружает только фоновое изображение.
+   */
   preload() {
     this.load.image('fon', 'assets/fon.jpg');
   }
 
+  /**
+   * Создаёт сцену игры, инициализирует менеджеры и сетку.
+   * @async
+   */
   async create() {
     let background;
     if (this.textures.exists('fon')) {
@@ -71,5 +88,8 @@ export class Game extends Scene {
     EventBus.emit('current-scene-ready', this);
   }
 
+  /**
+   * Обновляет состояние сцены (пока пусто).
+   */
   update() {}
 }

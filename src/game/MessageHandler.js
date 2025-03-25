@@ -1,3 +1,18 @@
+/**
+ * Обрабатывает сообщения и изменения состояния от Colyseus.
+ * @module MessageHandler
+ */
+
+/**
+ * Класс для обработки сообщений сервера.
+ * @class
+ * @param {Colyseus.Room} room - Комната Colyseus для получения сообщений
+ * @param {GameStateManager} gameStateManager - Менеджер состояния игры
+ * @param {UIManager} uiManager - Менеджер UI (может быть null)
+ * @param {Function} onDisconnect - Коллбэк для обработки отключения
+ * @param {HexGrid} hexGrid - Сетка гексов для обновления
+ */
+
 export class MessageHandler {
   constructor(room, gameStateManager, uiManager, onDisconnect, hexGrid) {
     this.room = room;
@@ -8,6 +23,9 @@ export class MessageHandler {
     this.setupListeners();
   }
   
+  /**
+   * Настраивает слушатели событий от Colyseus.
+   */
   setupListeners() {
     this.room.onStateChange.once((state) => {
       console.log('Initial state received:', state);

@@ -1,3 +1,8 @@
+/**
+ * Модуль логирования сервера.
+ * Настраивает Winston для вывода логов в консоль, файлы и Loki (в production).
+ * @module Logger
+ */
 import winston from "winston";
 import LokiTransport from "winston-loki";
 import os from "os";
@@ -11,7 +16,10 @@ const levels = {
     debug: 4,
 };
 
-// Цвета для разных уровней логирования
+/**
+ * Цвета для разных уровней логирования в консоли.
+ * @type {Object}
+ */
 const colors = {
     error: 'red',
     warn: 'yellow',
@@ -38,7 +46,10 @@ const lokiFormat = winston.format.combine(
     winston.format.json()
 );
 
-// Создаем массив транспортов
+/**
+ * Массив транспортов для вывода логов.
+ * @type {Array}
+ */
 const transports = [
     // Консольный вывод
     new winston.transports.Console({
@@ -84,7 +95,10 @@ if (process.env.NODE_ENV === 'production') {
     );
 }
 
-// Создаем логгер
+/**
+ * Экземпляр логгера Winston для серверной части.
+ * @type {winston.Logger}
+ */
 const logger = winston.createLogger({
     levels,
     format: winston.format.combine(
@@ -94,7 +108,12 @@ const logger = winston.createLogger({
     transports,
 });
 
-// Middleware для логирования HTTP запросов
+/**
+ * Middleware для логирования HTTP-запросов.
+ * @param {Object} req - Объект запроса Express
+ * @param {Object} res - Объект ответа Express
+ * @param {Function} next - Функция перехода к следующему middleware
+ */
 export const httpLogger = (req, res, next) => {
     const start = Date.now();
     res.on('finish', () => {

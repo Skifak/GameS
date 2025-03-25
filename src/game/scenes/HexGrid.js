@@ -1,6 +1,18 @@
+/**
+ * Рендерит гексагональную сетку и маркер игрока в сцене Phaser.
+ * @module HexGrid
+ */
+
 import { EventBus } from '../EventBus';
 import logger from '../../utils/logger';
 
+/**
+ * Класс для отображения и управления гексагональной сеткой.
+ * @class
+ * @param {Phaser.Scene} scene - Экземпляр сцены Phaser
+ * @param {Colyseus.Room} room - Комната Colyseus для синхронизации
+ * @param {MapDataManager} mapDataManager - Менеджер данных карты
+ */
 export class HexGrid {
   constructor(scene, room, mapDataManager) {
     this.scene = scene;
@@ -12,6 +24,9 @@ export class HexGrid {
     this.marker = null;
   }
 
+  /**
+   * Очищает текущую сетку перед перерисовкой. Вызывается перед загрузкой новой карты.
+   */
   clearGrid() {
     if (this.board) {
       this.board.destroy();
@@ -22,6 +37,10 @@ export class HexGrid {
     }
   }
 
+  /**
+   * Инициализирует и рисует гексагональную сетку. Вызывается после загрузки карты.
+   * @async
+   */
   async initGrid() {
     this.clearGrid();
 
@@ -72,6 +91,9 @@ export class HexGrid {
     this.updateMarker();
   }
 
+  /**
+   * Обновляет маркер позиции игрока на сетке. Вызывается при изменении позиции игрока.
+   */
   updateMarker() {
     if (!this.room || !this.room.state || !this.room.state.players || !this.board) {
       logger.warn('Room state or board not ready for marker update');
@@ -90,11 +112,20 @@ export class HexGrid {
     }
   }
 
+  /**
+   * Обрабатывает клик по гексу и отправляет команду на сервер.
+   * @param {number} q - Координата q гекса
+   * @param {number} r - Координата r гекса
+   */
   handleHexClick(q, r) {
     logger.info(`Hex clicked: q:${q}, r:${r}`);
     this.room.send('moveToHex', { q, r });
   }
 
+  /**
+   * Обновляет комнату для синхронизации маркера.
+   * @param {Colyseus.Room} room - Новая комната Colyseus
+   */
   updateRoom(room) {
     this.room = room;
     this.updateMarker();

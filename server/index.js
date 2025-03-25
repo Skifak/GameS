@@ -31,6 +31,11 @@ const gameServer = new Server({ transport });
 
 const redisService = new RedisService();
 
+/**
+ * Инициализирует подключение к Redis с проверкой конфигурации.
+ * @async
+ * @throws {Error} Если подключение к Redis не удалось и не разрешено его отсутствие
+ */
 async function initRedis() {
   if (config.allowMissingRedis) {
     logger.warn("Redis initialization skipped as per configuration");
@@ -51,12 +56,25 @@ app.use(cors(config.cors));
 app.use(express.json());
 app.use('/admin', adminRouter);
 
+/**
+ * Класс комнаты Colyseus для управления гексами.
+ * @class
+ * @extends Room
+ */
 class HexRoom extends Room {
   onCreate(options) {
     this.maxClients = 20;
     logger.info("Hex room created");
   }
 
+  /**
+   * Аутентифицирует клиента через Supabase.
+   * @async
+   * @param {Object} client - Клиент Colyseus
+   * @param {Object} options - Опции подключения клиента
+   * @returns {Object} Данные пользователя и профиля
+   * @throws {Error} Если аутентификация не удалась
+   */
   async onAuth(client, options) {
     const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
     if (!options.token) throw new Error("No token provided");
@@ -75,17 +93,34 @@ class HexRoom extends Room {
     return { user, profile };
   }
 
+  /**
+   * Обрабатывает присоединение клиента к комнате. Устанавливает статус игрока в Redis.
+   * @async
+   * @param {Object} client - Клиент Colyseus
+   * @param {Object} options - Опции подключения
+   * @param {Object} auth - Данные аутентификации
+   */
   async onJoin(client, options, auth) {
     logger.info(`Player ${auth.profile.username} joined room ${this.roomId}`);
     await redisService.setPlayerSession(client.sessionId, { status: "active" });
   }
 
+  /**
+   * Обрабатывает выход клиента из комнаты. Удаляет сессию игрока из Redis.
+   * @async
+   * @param {Object} client - Клиент Colyseus
+   * @param {boolean} consented - Было ли отключение добровольным
+   */
   async onLeave(client, consented) {
     logger.info(`Player ${client.sessionId} left`);
     await redisService.deletePlayerSession(client.sessionId);
   }
 }
 
+/**
+ * Инициализирует сервер и регистрирует комнаты.
+ * @async
+ */
 (async () => {
   try {
     const supabaseUrl = process.env.SUPABASE_PUBLIC_URL;

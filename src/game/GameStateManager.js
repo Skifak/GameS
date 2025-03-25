@@ -1,6 +1,18 @@
+/**
+ * Управляет состоянием игры, синхронизируя данные между клиентом и сервером.
+ * @module GameStateManager
+ */
 import { EventBus } from './EventBus';
 import logger from '../utils/logger';
 
+/**
+ * Класс для управления состоянием игры.
+ * @class
+ * @param {ConnectionManager} connectionManager - Менеджер подключения к Colyseus
+ * @param {PlayerController} playerController - Контроллер позиции игрока
+ * @param {UIManager} uiManager - Менеджер UI (может быть null)
+ * @param {Object} supabase - Клиент Supabase для доступа к данным
+ */
 export class GameStateManager {
   constructor(connectionManager, playerController, uiManager, supabase) {
     this.connectionManager = connectionManager;
@@ -12,11 +24,18 @@ export class GameStateManager {
     this.setupListeners();
   }
 
+  /**
+   * Настраивает слушатели событий для обработки команд и статуса.
+   */
   setupListeners() {
     EventBus.on('moveToPointRequested', (pointId) => this.moveToPoint(pointId));
     EventBus.on('connectionStatusChanged', (status) => this.uiManager?.setStatus(status));
   }
 
+  /**
+   * Инициализирует состояние игрока и подключается к комнате.
+   * @async
+   */
   async init() {
     const { data: { session } } = await this.supabase.auth.getSession();
     if (session) {
@@ -40,6 +59,12 @@ export class GameStateManager {
     await this.connectToPoint();
   }
 
+  /**
+   * Подключается к комнате Colyseus для текущей точки.
+   * @async
+   * @returns {Promise<void>}
+   * @throws {Error} Если подключение не удалось
+   */
   async connectToPoint() {
     try {
       if (this.room) {
@@ -66,6 +91,12 @@ export class GameStateManager {
     }
   }
 
+  /**
+   * Обновляет позицию игрока на карте.
+   * @param {number} q - Координата q гекса
+   * @param {number} r - Координата r гекса
+   * @param {boolean} [useTween=false] - Использовать ли анимацию
+   */
   updatePlayerPosition(q, r, useTween = false) {
     this.player.q = q;
     this.player.r = r;
@@ -73,6 +104,10 @@ export class GameStateManager {
     logger.info(`Player position updated to q:${q}, r:${r}`);
   }
 
+  /**
+   * Перемещает игрока к указанной точке (не используется в MVP).
+   * @param {number} pointId - Идентификатор точки
+   */
   async moveToPoint(pointId) {
     logger.warn('moveToPoint is not used in MVP');
   }

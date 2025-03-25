@@ -1,7 +1,16 @@
+/**
+ * Управляет подключением к комнатам Colyseus с аутентификацией через Supabase.
+ * @module ConnectionManager
+ */
 import { Client } from 'colyseus.js';
 import { EventBus } from './EventBus';
 import logger from '../utils/logger';
 
+/**
+ * Класс для управления соединением с сервером Colyseus.
+ * @class
+ * @param {Object} supabase - Клиент Supabase для аутентификации
+ */
 export class ConnectionManager {
   constructor(supabase) {
     this.client = new Client('ws://localhost:2567');
@@ -11,6 +20,13 @@ export class ConnectionManager {
     this.currentPointId = null;
   }
 
+  /**
+   * Подключается к комнате Colyseus для указанной точки.
+   * @async
+   * @param {number} pointId - Идентификатор точки для подключения
+   * @returns {Promise<Colyseus.Room>} Подключённая комната
+   * @throws {Error} Если аутентификация или подключение не удались
+   */
   async connect(pointId) {
     if (this.isConnecting || this.room) return this.room;
     this.isConnecting = true;
@@ -50,6 +66,10 @@ export class ConnectionManager {
     }
   }
 
+  /**
+   * Переподключается к комнате для текущей точки.
+   * @async
+   */
   async reconnect() {
     if (!this.currentPointId) return;
     this.room?.leave();
@@ -57,7 +77,11 @@ export class ConnectionManager {
     await this.connect(this.currentPointId);
     logger.info(`Reconnected to point ${this.currentPointId}`);
   }
-
+  
+  /**
+   * Возвращает текущую комнату Colyseus.
+   * @returns {Colyseus.Room|null} Текущая комната или null, если не подключено
+   */
   getRoom() {
     return this.room;
   }

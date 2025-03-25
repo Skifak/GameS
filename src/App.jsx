@@ -4,7 +4,7 @@
  * @module App
  */
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { PhaserGame } from './game/PhaserGame';
 import AuthForm from './components/AuthForm';
 import { useAuth } from './hooks/useAuth';
@@ -19,6 +19,7 @@ import 'react-toastify/dist/ReactToastify.css';
 function App() {
     const { isAuthenticated, loading, user, signOut } = useAuth();
     const phaserRef = useRef();
+    const [activeScene, setActiveScene] = useState('Game');
 
     if (loading) {
         return (
@@ -32,6 +33,18 @@ function App() {
         return <AuthForm />;
     }
 
+    const handleRedactMap = () => {
+        if (user?.profile?.role === 'admin') {
+          setActiveScene('EditorScene');
+        } else {
+          alert('Доступно только для администраторов');
+        }
+      };
+    
+      const handleBackToGame = () => {
+        setActiveScene('Game');
+      };
+
     return (
         <div id="game-container">
             <div className="interface">
@@ -41,13 +54,22 @@ function App() {
                     </div>
                     <div className="tab-content-buttons">
                         <button className="profile-text">Профиль</button>
+                        {activeScene === 'Game' ? (
+              <button className="profile-text" onClick={handleRedactMap}>
+                Редактор
+              </button>
+            ) : (
+              <button className="profile-text" onClick={handleBackToGame}>
+                Вернуться в игру
+              </button>
+            )}
                         <button className="logout-text" onClick={signOut}>
                             Выйти
                         </button>
                     </div>
                 </div>
             </div>
-            <PhaserGame ref={phaserRef} />
+            <PhaserGame ref={phaserRef} activeScene={activeScene}/>
             <ToastContainer position="top-right" autoClose={3000} />
         </div>
     );

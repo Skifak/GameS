@@ -1,3 +1,13 @@
+/**
+ * Управляет пользовательским интерфейсом в сцене Phaser.
+ * @module UIManager
+ */
+
+/**
+ * Класс для отображения и управления UI-элементами в игре.
+ * @class
+ * @param {Phaser.Scene} scene - Экземпляр сцены Phaser для рендеринга UI
+ */
 export class UIManager {
     constructor(scene) {
         this.scene = scene;
@@ -7,7 +17,11 @@ export class UIManager {
             fontFamily: 'Arial'
         }).setScrollFactor(0).setDepth(10);
     }
-
+    
+    /**
+   * Устанавливает текст статуса в UI.
+   * @param {string} message - Сообщение для отображения
+   */
     setStatus(message) {
         this.statusText.setText(message);
     }
