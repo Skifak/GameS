@@ -1,202 +1,146 @@
-### План разработки для "Zone of Shadows"
+# Пошаговый план разработки механики перемещения и редактора карты
 
-#### Общие принципы
+## Общие принципы
 - **Параллельная разработка**: Полная реализация точек и путей, минимальный MVP для редактора.
-- **Визуализация**: Только текущий гекс с точками и путями(цвет по типу не отображать), остальные гексы — цвет по типу с прозрачностью 90%, точки и пути не отображать.
-- **Инструменты**: Phaser.js, Colyseus, Supabase, React DnD, `phaser3-rex-plugins`.
+- **Визуализация**: Только текущий гекс с точками и путями (цвет по типу не отображать), остальные гексы — цвет по типу с прозрачностью 90%, точки и пути не отображать.
+- **Инструменты**: Phaser.js, Colyseus, Supabase, `phaser3-rex-plugins` (React DnD удалён).
 - **Тестирование**: Ручное, Cypress добавляется позже.
-- **Документирование**: Документировать с помощью JSDoc для классов и методов.
-- **Правила разработки**: Соблюдать правила из документа - DOCUMENTATION\RULE_DEV.md
+- **Документирование**: JSDoc для классов и методов.
+- **Правила разработки**: Соблюдать правила из `DOCUMENTATION\RULE_DEV.md`.
+
 ---
 
-#### Этап 1: Подготовка инфраструктуры
-- **Цель**: Подготовить проект, базу данных и структуру для разработки.
+## Этап 1: Подготовка инфраструктуры
+- **Статус**: Выполнено.
 - **Подзадачи**:
-  1. **Установка зависимостей**: - выполнено
-     - Установить React DnD: `npm install react-dnd react-dnd-html5-backend`.
-     - Проверить наличие `phaser3-rex-plugins`, Phaser.js, Colyseus, Supabase в `package.json`.
-  2. **Обновление базы данных**: - выполнено
-     - Создать миграцию `supabase/migrations/20250323120001_add_energy_to_profiles.sql`:
-       ```sql
-       ALTER TABLE profiles ADD COLUMN energy INTEGER DEFAULT 100;
-       CREATE INDEX idx_profiles_energy ON profiles(energy);
-       ```
-     - Cоздать миграцию `20250323120002_add_bidirectional_to_point_transitions.sql`:
-       ```sql
-       ALTER TABLE point_transitions
-       ADD COLUMN is_bidirectional BOOLEAN DEFAULT FALSE;
-       CREATE INDEX idx_point_transitions_bidirectional ON point_transitions (is_bidirectional);
-       ```
-  3. **Создание файлов визуализации**: - выполнено
-     - `src/game/scenes/Point.js` — рендеринг и логика точек. - выполнено
-     - `src/game/scenes/Path.js` — рендеринг и логика путей. - выполнено
-  4. **Создание ветки**:
-     - `git checkout -b feature/movement-and-map-editor`. - выполнено
-- **Файлы**: - выполнено
-  - `package.json`.
-  - `supabase/migrations/20250323120001_add_energy_to_profiles.sql`.
-  - `supabase/migrations/20250316190346_create_point_transitions.sql` (обновление).
-  - `src/game/scenes/Point.js`, `src/game/scenes/Path.js`.
-- **Результат**: Проект готов, добавлены файлы, база поддерживает энергию и двухсторонние связи.
+  1. Установлены зависимости (`phaser3-rex-plugins`, Phaser.js, Colyseus, Supabase).
+  2. Обновлена база данных (`energy`, `is_bidirectional`).
+  3. Созданы `Point.js`, `Path.js`.
+  4. Ветка `feature/movement-and-map-editor` создана.
+- **Изменения**: React DnD удалён, редактор переведён на Phaser (`EditorScene.js`).
 
-#### Этап 2: Реализация механики перемещения игрока
-##### 2.1. Отображение гексов, точек и путей
-- **Цель**: Визуализировать текущий гекс с точками и путями, остальные — только тип.
+---
+
+## Этап 2: Реализация механики перемещения игрока
+
+### 2.1. Отображение гексов, точек и путей
+- **Статус**: В процессе.
 - **Подзадачи**:
   1. **Обновление HexGrid.js**:
-     - Адаптировать:
-       - Рендерить все гексы с типом (`neutral`, `free`, `danger`, `controlled`), `alpha: 0.9`.
-       - Для текущего гекса (`profiles.current_hex_q`, `current_hex_r`) загружать точки и пути через `MapDataManager`.
+     - Рендерить гексы с типом (`alpha: 0.9`).
+     - Для текущего гекса загружать точки и пути из Supabase через `MapDataManager`.
   2. **Обновление Point.js**:
-     - Рендерить точки текущего гекса:
-       - Круг радиусом 10px, цвет по типу (например, `camp` — зелёный, `transition` — синий), `alpha: 0.9`.
-       - Клик по точке загружает пути через `MapDataManager`.
-  3. **Обновление Path.js**:
-     - Рендерить пути текущего гекса:
-       - Линия от `from_point_id` до первого узла, круг 10px, линия до следующего узла и т.д., до `to_point_id`.
-       - Активный путь: зелёный, толщина 5px, узел 13px, `alpha: 0.9`.
-       - Неактивный: серый, толщина 3px, узел 10px.
-       - Выбранный: зелёный, толщина 3px, узел 10px.
-       - Наведение на следующий/предыдущий узел: радиус +3px.
-       - Весь путь остаётся видимым.
-     - Клик по узлу для последовательного перемещения.
+     - Рендерить точки текущего гекса (круг 10px, цвет по типу, `alpha: 0.9`).
+     - Клик загружает пути.
+  3. **Обновление Path.js** (заменено на HexGrid.js)**:
+     - Рендерить пути текущего гекса (прямые линии, узлы как круги 10px).
+     - Активный путь: зелёный, толщина 5px, узел 13px.
+     - Неактивный: серый, толщина 3px, узел 10px.
+     - Клик по узлу для движения.
   4. **Обновление MapDataManager.js**:
-     - Добавить методы:
-       - `fetchCurrentHexData(hexQ, hexR)`: запрос точек и путей для гекса.
-       - `cacheHexData(hexQ, hexR, data)`: кэшировать с TTL 10 минут (`setTimeout` для очистки).
-       - `loadHexData(hexQ, hexR)`: сначала кэш, затем база.
+     - `fetchCurrentHexData(hexQ, hexR)`: запрос точек и путей.
+     - `cacheHexData(hexQ, hexR, data)`: кэш с TTL 10 минут.
+     - `loadHexData(hexQ, hexR)`: кэш или база.
   5. **Обновление UIManager.js**:
-     - Добавить React-компонент `<TransitionButton />`:
-       - Показывать внизу по центру при достижении переходной точки.
-       - Текст: "Перейти на соседнюю территорию".
+     - Кнопка "Перейти на соседнюю территорию" при достижении переходной точки.
 - **Файлы**:
-  - `src/game/scenes/HexGrid.js`.
-  - `src/game/scenes/Point.js`.
-  - `src/game/scenes/Path.js`.
-  - `src/game/MapDataManager.js`.
-  - `src/components/UIManager.js`.
-- **Результат**: Текущий гекс отображает точки и пути, кнопка появляется при переходе.
+  - `src/game/scenes/HexGrid.js`, `Point.js`, `MapDataManager.js`, `UIManager.js`.
 
-##### 2.2. Логика перемещения
-- **Цель**: Перемещение по узлам и между гексами с сохранением прогресса.
+### 2.2. Логика перемещения
+- **Статус**: В процессе.
 - **Подзадачи**:
   1. **Обновление PlayerController.js**:
-     - `moveToNode(node)`: анимация до узла, проверка последовательности.
-     - `moveToHex(hexQ, hexR)`: переход в новый гекс после кнопки, очистка кэша старого гекса.
+     - `moveToNode(pathId, nodeIndex)`: анимация до узла.
+     - `moveToHex(hexQ, hexR)`: переход в новый гекс.
   2. **Обновление CommandSender.js**:
      - `sendMoveCommand(pathId, nodeId)`: перемещение по узлу.
-     - `sendHexTransition(pointId)`: переход в другой гекс.
+     - `sendHexTransition(pointId)`: переход в гекс.
   3. **Обновление pointRoom.js**:
-     - Обрабатывать:
-       - `move`: обновить `current_point_id`, сохранить в `player_sessions.session_data` (`{ pathId, nodeId }`).
-       - `hex_transition`: найти связанную точку через `point_transitions` с `is_bidirectional = true`, обновить `current_hex_q`, `current_hex_r`.
+     - `move`: обновить `current_point_id`, сохранить в `player_sessions`.
+     - `hex_transition`: обновить `current_hex_q`, `current_hex_r`.
   4. **Обновление MessageHandler.js**:
-     - Обрабатывать ответы для `moveToNode` и `moveToHex`.
+     - Обрабатывать `moveToNode`, `moveToHex`.
   5. **Обновление Game.js**:
-     - При загрузке:
-       - Загружать путь из `player_sessions.session_data`.
-       - Использовать `MapDataManager.loadHexData` (кэш или база).
+     - Загружать путь из `player_sessions.session_data`.
 - **Файлы**:
-  - `src/components/PlayerController.js`.
-  - `src/game/CommandSender.js`.
-  - `server/pointRoom.js`.
-  - `src/game/MessageHandler.js`.
-  - `src/game/scenes/Game.js`.
-- **Результат**: Игрок движется по узлам и переходит между гексами.
+  - `src/components/PlayerController.js`, `CommandSender.js`, `server/pointRoom.js`, `MessageHandler.js`, `Game.js`.
 
-##### 2.3. События на узлах
-- **Цель**: Модальные окна через `phaser3-rex-plugins` с кнопкой "Закрыть".
+### 2.3. События на узлах
+- **Статус**: Не начато.
 - **Подзадачи**:
-  1. **Обновление Path.js**:
+  1. **Обновление Path.js** (или HexGrid.js)**:
      - Передавать `node.event` в `Game.js`.
   2. **Обновление Game.js**:
-     - `showEventModal(event)`: использовать `rexUI.add.confirmDialog` с текстом и кнопкой "Закрыть".
+     - `showEventModal(event)`: `rexUI.add.confirmDialog` с кнопкой "Закрыть".
   3. **Обновление UIManager.js**:
      - `showRexModal(text)`: управление модалкой.
 - **Файлы**:
-  - `src/game/scenes/Path.js`.
-  - `src/game/scenes/Game.js`.
-  - `src/components/UIManager.js`.
-- **Результат**: Модальные окна с кнопкой "Закрыть".
+  - `src/game/scenes/HexGrid.js`, `Game.js`, `UIManager.js`.
 
-##### 2.4. Управление энергией
-- **Цель**: Ограничение энергией с прогресс-баром.
+### 2.4. Управление энергией
+- **Статус**: Не начато.
 - **Подзадачи**:
   1. **Обновление GameStateManager.js**:
-     - `getEnergy()`, `updateEnergy(amount)`, `startEnergyRegen()` (1 единица/3 секунды, независимо от модалок).
-     - Проверять энергию (минимум 5).
+     - `getEnergy()`, `updateEnergy(amount)`, `startEnergyRegen()` (1 ед./3 сек).
   2. **Обновление pointRoom.js**:
      - Уменьшать энергию на 5 при движении.
   3. **Обновление UIManager.js**:
-     - `renderEnergyBar()`: темно-голубой статичный прогресс-бар внизу экрана.
+     - `renderEnergyBar()`: прогресс-бар внизу.
 - **Файлы**:
-  - `src/game/GameStateManager.js`.
-  - `server/pointRoom.js`.
-  - `src/components/UIManager.js`.
-- **Результат**: Энергия восстанавливается, прогресс-бар виден.
+  - `src/game/GameStateManager.js`, `server/pointRoom.js`, `UIManager.js`.
 
-#### Этап 3: Реализация редактора карты (MVP)
-##### 3.1. Создание интерфейса редактора
-- **Цель**: Минимальный редактор с полным редактированием.
+---
+
+## Этап 3: Реализация редактора карты (MVP)
+
+### 3.1. Создание интерфейса редактора
+- **Статус**: В процессе.
 - **Подзадачи**:
-  1. **Создание MapEditor.jsx**:
-     - Включить `HexGrid.js` с `editable={true}`.
-     - Панель свойств: поля для `id`, `type`, `x`, `y`, `hex_q`, `hex_r` (точки), `from_point_id`, `to_point_id`, `nodes`, `is_bidirectional` (пути).
-     - Кнопка "Сохранить".
-     - Загружать данные из `localStorage` (`mapEditorDraft`) при монтировании.
+  1. **Обновление EditorScene.js**:
+     - Использовать пример Phaser для создания/редактирования путей.
+     - Панель свойств через `rexUI` (поля: `id`, `type`, `x`, `y`, `hex_q`, `hex_r`, `from_point_id`, `to_point_id`, `nodes`, `is_bidirectional`).
+     - Кнопка "Сохранить" для отправки в Supabase.
   2. **Обновление App.jsx**:
-     - Показывать `MapEditor.jsx` для `role = 'admin'`.
+     - Переключение на `EditorScene` для админов.
   3. **Обновление useAuth.js**:
-     - `getUserRole()`: запрос роли из `profiles`.
+     - `getUserRole()`: запрос роли.
 - **Файлы**:
-  - `src/components/MapEditor.jsx`.
-  - `src/App.jsx`.
-  - `src/hooks/useAuth.js`.
-- **Результат**: Админ видит редактор с панелью и кнопкой.
+  - `src/game/scenes/EditorScene.js`, `App.jsx`, `useAuth.js`.
 
-##### 3.2. Drag-and-Drop для точек и путей
-- **Цель**: Редактирование через DnD с сохранением в `localStorage`.
+### 3.2. Drag-and-Drop для точек и путей
+- **Статус**: В процессе.
 - **Подзадачи**:
-  1. **Обновление MapEditor.jsx**:
-     - DnD:
-       - Точки: перемещение с ПКМ, обновление `x`, `y`.
-       - Пути: выбор `from_point_id`, `to_point_id`, узлы через DnD.
-     - Сохранять в `localStorage` (`mapEditorDraft`):
-       - Формат: `{ points: [{ id, type, x, y, hex_q, hex_r }], paths: [{ id, from_point_id, to_point_id, nodes, is_bidirectional }] }`.
-     - При "Сохранить": отправлять POST/PUT в Supabase, очищать `localStorage`.
-  2. **Обновление admin.js**:
-     - Эндпоинты CRUD для `points_of_interest` и `point_transitions` с проверкой `role`.
+  1. **Обновление EditorScene.js**:
+     - Drag-and-drop для узлов (прямые линии вместо сплайнов).
+     - Выбор `from_point_id`, `to_point_id` через клик по POI.
+     - Сохранение в Supabase при нажатии "Сохранить".
 - **Файлы**:
-  - `src/components/MapEditor.jsx`.
-  - `server/admin.js`.
-- **Результат**: Админ редактирует карту, сохраняет по кнопке.
+  - `src/game/scenes/EditorScene.js`.
 
-##### 3.3. Синхронизация с Supabase
-- **Цель**: Обновление карты при загрузке.
+### 3.3. Синхронизация с Supabase
+- **Статус**: Не начато.
 - **Подзадачи**:
   1. **Обновление supabase.js**:
      - Подписки на `points_of_interest`, `point_transitions`.
   2. **Обновление HexGrid.js**:
      - Обновлять данные при загрузке гекса.
 - **Файлы**:
-  - `src/lib/supabase.js`.
-  - `src/game/scenes/HexGrid.js`.
-- **Результат**: Карта синхронизируется при входе.
-
-#### Этап 4: Тестирование
-- **Цель**: Ручное тестирование.
-- **Подзадачи**:
-  1. **Ручные тесты**:
-     - Перемещение по узлам с событиями.
-     - Переход между гексами.
-     - Редактирование в MVP.
-  2. **Отложить Cypress**:
-     - Добавить позже после ручных тестов.
-- **Результат**: Механика и редактор протестированы вручную.
+  - `src/lib/supabase.js`, `src/game/scenes/HexGrid.js`.
 
 ---
 
-### Итог
-- **Механика**: Полная реализация точек, путей, переходов между гексами, энергии и событий.
-- **Редактор**: MVP с DnD, редактированием всех полей, сохранением через кнопку и `localStorage`.
+## Этап 4: Тестирование
+- **Статус**: Не начато.
+- **Подзадачи**:
+  1. Ручные тесты:
+     - Перемещение по узлам.
+     - Переход между гексами.
+     - Редактирование в `EditorScene`.
+  2. Отложить Cypress.
+
+---
+
+## Итог
+- **Механика**: Полная реализация точек, путей, переходов, энергии, событий.
+- **Редактор**: MVP на Phaser в `EditorScene.js` с сохранением в Supabase.
 - **Тестирование**: Ручное, Cypress отложен.
