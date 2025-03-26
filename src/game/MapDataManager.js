@@ -276,4 +276,14 @@ export class MapDataManager {
       return [];
     }
   }
+
+  async deletePoint(pointId) {
+    try {
+      const { error } = await supabase.from('points_of_interest').delete().eq('id', pointId);
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      throw new Error(`Failed to delete point: ${error.message}`);
+    }
+  }
 }

@@ -1,0 +1,199 @@
+/* Основные стили редактора, адаптированные под общий дизайн игры */
+:root {
+    --toolbar-height: 50px;
+    --form-width: 220px;
+    --form-height: 250px; /* Для формы создания */
+    --edit-form-height: 300px; /* Для формы редактирования */
+  }
+  
+  /* Панель инструментов */
+  .toolbar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: var(--toolbar-height);
+    background-color: var(--woodsmoke);
+    border-top: 1px solid var(--outer-space);
+    color: var(--silver-chalice);
+    font-family: Verdana, Arial, Helvetica, sans-serif;
+    pointer-events: auto;
+  }
+  
+  .toolbar .hex-info-text,
+  .toolbar .mode-text {
+    font-size: 14px;
+    color: var(--silver-chalice);
+    padding: 0 10px;
+  }
+  
+  .toolbar .button-container {
+    display: inline-block;
+    margin: 7.5px 10px;
+  }
+  
+  .toolbar .button-bg {
+    fill: var(--masala);
+    stroke: var(--outer-space);
+    transition: all 0.3s;
+  }
+  
+  .toolbar .button-text {
+    font-size: 12px;
+    color: var(--silver-chalice);
+    text-align: center;
+  }
+  
+  .toolbar .button-container:hover .button-bg {
+    stroke: var(--green);
+  }
+  
+  .toolbar .button-container:hover .button-text {
+    color: var(--green);
+  }
+  
+  .toolbar .button-container:active .button-bg {
+    fill: var(--dove-gray3);
+  }
+  
+  /* Общие стили для форм (создание и редактирование) */
+  .point-form, .edit-point-form {
+    position: absolute;
+    right: 10px;
+    top: 50px;
+    width: var(--form-width);
+    background-color: var(--woodsmoke);
+    border: 1px solid var(--outer-space);
+    color: var(--silver-chalice);
+    font-family: Verdana, Arial, Helvetica, sans-serif;
+    padding: 10px;
+    box-sizing: border-box;
+    pointer-events: auto;
+  }
+  
+  /* Специфичные размеры для форм */
+  .point-form {
+    height: var(--form-height);
+  }
+  
+  .edit-point-form {
+    height: var(--edit-form-height);
+  }
+  
+  /* Заголовок формы */
+  .form-title {
+    font-size: 16px;
+    color: var(--orange);
+    text-align: center;
+    margin-bottom: 15px;
+  }
+  
+  /* Метки полей */
+  .form-label {
+    font-size: 12px;
+    color: var(--silver-chalice);
+    margin-bottom: 5px;
+  }
+  
+  /* Поле ввода названия */
+  .form-input-bg {
+    fill: var(--masala);
+    stroke: var(--outer-space);
+    transition: all 0.3s;
+  }
+  
+  .form-input {
+    width: 160px;
+    padding: 5px;
+    background-color: transparent;
+    border: none;
+    color: var(--silver-chalice);
+    font-size: 12px;
+  }
+  
+  .form-input:focus {
+    outline: none;
+  }
+  
+  .form-input-bg:hover,
+  .form-input:focus + .form-input-bg {
+    stroke: var(--green);
+  }
+  
+  /* Выбор типа точки */
+  .type-selector-bg {
+    fill: var(--masala);
+    stroke: var(--outer-space);
+    transition: all 0.3s;
+  }
+  
+  .type-text {
+    font-size: 12px;
+    color: var(--silver-chalice);
+  }
+  
+  .type-selector-bg:hover {
+    stroke: var(--green);
+  }
+  
+  .type-arrow {
+    fill: var(--dimgrey);
+    transition: all 0.3s;
+  }
+  
+  .type-arrow:hover {
+    fill: var(--green);
+  }
+  
+  /* Кнопки формы */
+  .form-button-container {
+    margin: 10px 0;
+  }
+  
+  .form-button-bg {
+    fill: var(--masala);
+    stroke: var(--outer-space);
+    transition: all 0.3s;
+  }
+  
+  .form-button-text {
+    font-size: 12px;
+    color: var(--silver-chalice);
+    text-align: center;
+  }
+  
+  /* Специфичные цвета для кнопок */
+  .form-button-create .form-button-bg,
+  .form-button-save .form-button-bg {
+    fill: var(--green);
+  }
+  
+  .form-button-cancel .form-button-bg,
+  .form-button-delete .form-button-bg {
+    fill: var(--woodsmoke2);
+  }
+  
+  .form-button-delete .form-button-bg {
+    fill: #ff6b6b; /* Красный для удаления */
+  }
+  
+  .form-button-container:hover .form-button-bg {
+    stroke: var(--green);
+  }
+  
+  .form-button-container:hover .form-button-text {
+    color: var(--green);
+  }
+  
+  .form-button-container:active .form-button-bg {
+    fill: var(--dove-gray3);
+  }
+  
+  /* Координаты */
+  .coordinates-text {
+    font-size: 12px;
+    color: var(--silver-chalice);
+    background-color: var(--masala);
+    padding: 3px 5px;
+    border: 1px solid var(--outer-space);
+  }
