@@ -28,16 +28,21 @@ export class MessageHandler {
    */
   setupListeners() {
     this.room.onStateChange.once((state) => {
-      console.log('Initial state received:', state);
-      const playerData = state.players.get(this.room.sessionId);
-      if (playerData) {
-        this.gameStateManager.updatePlayerPosition(playerData.q, playerData.r, false);
-      }
-      this.hexGrid.initGrid().then(() => {
+      console.log('Initial state received: ', state);
+      
+      // Исправляем ссылку на hexGrid
+      if (this.hexGrid) {
+        this.hexGrid.initGrid();
         console.log('HexGrid initialized after state received');
-      }).catch(err => {
-        console.error('HexGrid init failed:', err);
-      });
+      }
+      
+      // Обновляем позицию игрока по начальному состоянию
+      if (state.players && this.gameStateManager) {
+        const player = state.players.get(this.room.sessionId);
+        if (player) {
+          this.gameStateManager.updatePlayerPosition(player.q, player.r, false);
+        }
+      }
     });
     
     this.room.onStateChange((state) => {

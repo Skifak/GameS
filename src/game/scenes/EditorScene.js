@@ -1,19 +1,22 @@
-// src/game/scenes/EditorScene.js
 import { Scene, Cameras } from 'phaser';
 import { EventBus } from '../EventBus';
-import { supabase } from '../../lib/supabase';
-import { ConnectionManager } from '../ConnectionManager';
 import { MapDataManager } from '../MapDataManager';
 import { HexGrid } from './HexGrid';
+import { Point } from './Point';
+import { createToolbar, createPointForm } from '../../utils/editorUtils';
 
 export class EditorScene extends Scene {
   constructor() {
     super({ key: 'EditorScene' });
-    this.supabase = supabase;
-    this.connectionManager = new ConnectionManager(this.supabase);
     this.mapDataManager = new MapDataManager();
     this.hexGrid = null;
     this.controls = null;
+    this.editMode = 'select';
+    this.currentHex = null;
+    this.newPointX = null;
+    this.newPointY = null;
+    this.previewPoint = null;
+    this.points = null;
   }
 
   preload() {
@@ -21,67 +24,165 @@ export class EditorScene extends Scene {
   }
 
   async create() {
-    // Добавляем фон
-    let background;
-    if (this.textures.exists('fon')) {
-      background = this.add.image(0, 0, 'fon').setOrigin(0, 0).setDepth(0);
-      const bgWidth = background.width;
-      const bgHeight = background.height;
-      if (bgWidth < 2048 || bgHeight < 2048) {
-        background.setScale(Math.max(2048 / bgWidth, 2048 / bgHeight));
-      }
-    } else {
-      this.cameras.main.setBackgroundColor(0xaaaaaa);
-      console.warn('Background image "fon.jpg" not found');
-    }
-
-    // Устанавливаем границы камеры
+    this.add.image(0, 0, 'fon').setOrigin(0, 0).setDepth(0).setScale(2048 / 1920);
     this.cameras.main.setBounds(0, 0, 2048, 2048);
 
-    // Отображаем текст для обозначения редактора
-    this.add.text(300, 30, 'Редактор карты', {
-      fontSize: '20px',
-      color: '#ffffff',
-    }).setOrigin(0.5).setDepth(10).setScrollFactor(0);
+    await this.mapDataManager.loadData();
+    this.hexGrid = new HexGrid(this, null, this.mapDataManager);
+    this.hexGrid.initGrid();
 
-    // Инициализация карты с гексами
-    try {
-      await this.mapDataManager.loadData();
-      this.hexGrid = new HexGrid(this, this.connectionManager.getRoom(), this.mapDataManager);
-      await this.hexGrid.initGrid();
-    } catch (error) {
-      console.error('Error initializing HexGrid:', error);
-    }
+    this.points = this.add.group();
+    const loadedPoints = await this.mapDataManager.loadPoints();
+    loadedPoints.forEach(point => this.createPoint(point.x, point.y, point.type, point.name, point));
 
-    // Настройка управления камерой
-    const cursors = this.input.keyboard.createCursorKeys();
-    const controlConfig = {
+    this.toolbar = createToolbar(this);
+    this.pointFormContainer = createPointForm(this);
+
+    this.setupInputHandlers();
+
+    this.controls = new Cameras.Controls.SmoothedKeyControl({
       camera: this.cameras.main,
-      left: cursors.left,
-      right: cursors.right,
-      up: cursors.up,
-      down: cursors.down,
+      left: this.input.keyboard.createCursorKeys().left,
+      right: this.input.keyboard.createCursorKeys().right,
+      up: this.input.keyboard.createCursorKeys().up,
+      down: this.input.keyboard.createCursorKeys().down,
       acceleration: 0.02,
       drag: 0.0005,
       maxSpeed: 1.0,
-    };
+    });
 
-    try {
-      this.controls = new Cameras.Controls.SmoothedKeyControl(controlConfig);
-      console.log('Camera controls initialized:', this.controls);
-    } catch (error) {
-      console.error('Error initializing camera controls:', error);
-    }
-
-    // Уведомляем React, что сцена готова
     EventBus.emit('current-scene-ready', this);
-
-
   }
 
   update(time, delta) {
-    if (this.controls) {
-      this.controls.update(delta);
+    this.controls?.update(delta);
+  }
+
+  setupInputHandlers() {
+    console.log('[DEBUG] Setting up input handlers for EditorScene');
+  
+    // Обработка кликов по объектам (левый клик)
+    this.input.on('gameobjectdown', (pointer, gameObject) => {
+      if (gameObject.type === 'hex') {
+        console.log(`[DEBUG] Direct hex click in EditorScene: q=${gameObject.q}, r=${gameObject.r}`);
+        const worldXY = this.hexGrid.board.tileXYToWorldXY(gameObject.q, gameObject.r);
+        this.currentHex = { q: gameObject.q, r: gameObject.r, worldX: worldXY.x, worldY: worldXY.y };
+        this.toolbar.hexInfoText.setText(`Гекс: q=${gameObject.q}, r=${gameObject.r}`);
+  
+        // Сохраняем координаты клика
+        const clickWorldX = pointer.x + this.cameras.main.scrollX;
+        const clickWorldY = pointer.y + this.cameras.main.scrollY;
+        if (this.isPointInCurrentHex({ x: clickWorldX, y: clickWorldY })) {
+          this.newPointX = clickWorldX;
+          this.newPointY = clickWorldY;
+          console.log(`[DEBUG] Click coordinates saved: x=${this.newPointX}, y=${this.newPointY}`);
+        }
+      }
+    });
+  
+    // Обработка через EventBus (левый клик)
+    EventBus.on('hexClicked', ({ q, r }) => {
+      console.log(`[DEBUG] EventBus hexClicked received: q=${q}, r=${r}, mode=${this.editMode}`);
+      if (this.editMode === 'select') {
+        const worldXY = this.hexGrid.board.tileXYToWorldXY(q, r);
+        this.currentHex = { q, r, worldX: worldXY.x, worldY: worldXY.y };
+        this.toolbar.hexInfoText.setText(`Гекс: q=${q}, r=${r}`);
+      }
+    });
+  
+    // Обработка правого клика (опционально)
+    this.input.on('pointerdown', (pointer) => {
+      if (pointer.rightButtonDown()) {
+        const worldX = pointer.x + this.cameras.main.scrollX;
+        const worldY = pointer.y + this.cameras.main.scrollY;
+        const tileXY = this.hexGrid.board.worldXYToTileXY(worldX, worldY);
+        const { q, r } = tileXY;
+        const hexGraphic = this.hexGrid.hexGraphics.getChildren().find(h => h.q === q && h.r === r);
+        if (hexGraphic) {
+          this.currentHex = { q, r, worldX: hexGraphic.worldX, worldY: hexGraphic.worldY };
+          this.newPointX = worldX;
+          this.newPointY = worldY;
+          console.log(`[DEBUG] Right-click coordinates saved: x=${this.newPointX}, y=${this.newPointY}`);
+        }
+      }
+    });
+  }
+
+  enterAddPointMode() {
+    console.log(`[DEBUG] Entering addPoint mode, currentHex:`, this.currentHex);
+    if (!this.currentHex || this.currentHex.q === undefined || this.currentHex.r === undefined) {
+      console.log('[DEBUG] No valid hex selected');
+      alert('Сначала выберите гекс!');
+      return;
     }
+    this.editMode = 'addPoint';
+    this.toolbar.modeText.setText('Режим: добавление точки');
+    const worldXY = this.hexGrid.board.tileXYToWorldXY(this.currentHex.q, this.currentHex.r);
+    this.newPointX = worldXY.x;
+    this.newPointY = worldXY.y;
+    this.pointFormContainer.setVisible(true);
+  }
+
+  createPointFromForm() {
+    const name = this.pointFormContainer.nameInput.node.value || 'Новая точка';
+    const type = this.pointFormContainer.typeOptions[this.pointFormContainer.currentTypeIndex];
+
+    const pointData = {
+      id: Date.now(),
+      name,
+      type,
+      hex_q: this.currentHex.q,
+      hex_r: this.currentHex.r,
+      x: Math.round(this.newPointX || this.hexGrid.board.tileXYToWorldXY(this.currentHex.q, this.currentHex.r).x),
+      y: Math.round(this.newPointY || this.hexGrid.board.tileXYToWorldXY(this.currentHex.q, this.currentHex.r).y),
+    };
+
+    this.createPoint(pointData.x, pointData.y, pointData.type, pointData.name, pointData);
+    this.resetMode();
+    this.mapDataManager.savePoint(pointData, true)
+      .then(saved => console.log('Point saved:', saved))
+      .catch(err => console.error('Save failed:', err));
+  }
+
+  createPoint(x, y, type, name, pointData) {
+    const point = new Point(this, { id: pointData.id, name, type, hex_q: pointData.hex_q, hex_r: pointData.hex_r, x, y });
+    this.points.add(point.graphic);
+    return point;
+  }
+
+  enterAddPathMode() {
+    this.editMode = 'addPath';
+    this.toolbar.modeText.setText('Режим: добавление пути');
+    // Реализация позже
+  }
+
+  async saveMap() {
+    const pointsData = this.points.getChildren().map(p => p.getData('pointData'));
+    try {
+      for (const point of pointsData) {
+        await this.mapDataManager.savePoint(point, true);
+      }
+      alert('Карта сохранена!');
+    } catch (error) {
+      console.error('Save error:', error);
+      alert(`Ошибка: ${error.message}`);
+    }
+  }
+
+  resetMode() {
+    this.editMode = 'select';
+    this.toolbar.modeText.setText('Режим: выбор гекса');
+    this.pointFormContainer.setVisible(false);
+    if (this.previewPoint) {
+      this.previewPoint.destroy();
+      this.previewPoint = null;
+    }
+    this.newPointX = null;
+    this.newPointY = null;
+  }
+
+  isPointInCurrentHex(point) {
+    const hexGraphic = this.hexGrid.hexGraphics.getChildren().find(h => h.q === this.currentHex.q && h.r === this.currentHex.r);
+    return hexGraphic && Phaser.Geom.Polygon.Contains(hexGraphic.geom, point.x, point.y);
   }
 }
