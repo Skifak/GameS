@@ -1,19 +1,23 @@
 import { Scene, Cameras } from 'phaser';
 import { EventBus } from '../EventBus.js';
 import { MapDataManager } from '../MapDataManager.js';
+import { PathDataManager } from '../PathDataManager.js';
 import { HexGrid } from './HexGrid.js';
 import { Point } from './Point.js';
+import { Path } from './Path.js';
 import logger from '../../utils/logger.js';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import Toolbar from '../../components/editor/Toolbar.jsx';
 import PointForm from '../../components/editor/PointForm.jsx';
 import EditPointForm from '../../components/editor/EditPointForm.jsx';
+import PathForm from '../../components/editor/PathForm.jsx';
 
 export class EditorScene extends Scene {
   constructor() {
     super({ key: 'EditorScene' });
     this.mapDataManager = new MapDataManager();
+    this.pathDataManager = new PathDataManager();
     this.hexGrid = null;
     this.controls = null;
     this.editMode = 'select';
@@ -22,8 +26,10 @@ export class EditorScene extends Scene {
     this.newPointY = null;
     this.previewPoint = null;
     this.points = null;
+    this.paths = null;
     this.selectedPoint = null;
     this.reactRoot = null;
+    this.draftPath = null; // { startPoint, endPoint, nodes }
   }
 
   preload() {
@@ -41,6 +47,10 @@ export class EditorScene extends Scene {
     this.points = this.add.group();
     const loadedPoints = await this.mapDataManager.loadPoints();
     loadedPoints.forEach(point => this.createPoint(point.x, point.y, point.type, point.name, point));
+
+    this.paths = this.add.group();
+    const loadedPaths = await this.pathDataManager.loadPaths();
+    loadedPaths.forEach(path => this.createPath(path));
 
     this.setupInputHandlers();
     this.renderReactUI();
@@ -79,7 +89,12 @@ export class EditorScene extends Scene {
           this.newPointX = clickWorldX;
           this.newPointY = clickWorldY;
           logger.info(`[DEBUG] Click coordinates saved: x=${this.newPointX}, y=${this.newPointY}`);
+          if (this.editMode === 'addPath' && this.draftPath?.startPoint && this.draftPath?.endPoint) {
+            this.addNodeToDraftPath(clickWorldX, clickWorldY);
+          }
         }
+      } else if (gameObject.pointData && this.editMode === 'addPath') {
+        this.handlePathPointClick(gameObject.pointData);
       }
     });
 
@@ -103,7 +118,7 @@ export class EditorScene extends Scene {
       if (pointer.rightButtonDown()) {
         const worldX = pointer.x + this.cameras.main.scrollX;
         const worldY = pointer.y + this.cameras.main.scrollY;
-        const tileXY = this.hexGrid.board.worldXYToTileXY(worldX, worldY);
+        const tileXY = this.hexGrid.board.tileXYToWorldXY(worldX, worldY);
         const { q, r } = tileXY;
         const hexGraphic = this.hexGrid.hexGraphics.getChildren().find(h => h.q === q && h.r === r);
         if (hexGraphic) {
@@ -115,6 +130,21 @@ export class EditorScene extends Scene {
         }
       }
     });
+
+    this.input.on('drag', (pointer, gameObject, dragX, dragY) => {
+      if (this.editMode === 'select' && gameObject.pathId !== undefined) {
+        const path = this.paths.getChildren().find(p => p.pathData.id === gameObject.pathId);
+        if (path) {
+          path.pathData.nodes[gameObject.nodeIndex] = {
+            ...path.pathData.nodes[gameObject.nodeIndex],
+            x: dragX,
+            y: dragY
+          };
+          path.render();
+          this.pathDataManager.saveDraft(path.pathData);
+        }
+      }
+    });
   }
 
   renderReactUI() {
@@ -122,7 +152,7 @@ export class EditorScene extends Scene {
     if (!this.reactRoot) {
       this.reactRoot = ReactDOM.createRoot(rootElement);
     }
-  
+
     this.reactRoot.render(
       <div className="interface editor-interface">
         <Toolbar
@@ -144,6 +174,16 @@ export class EditorScene extends Scene {
             point={this.selectedPoint}
             onSave={(data) => this.updatePointFromForm(data)}
             onDelete={() => this.deletePoint()}
+            onCancel={() => this.resetMode()}
+          />
+        )}
+        {this.editMode === 'addPath' && (
+          <PathForm
+            startPoint={this.draftPath?.startPoint}
+            endPoint={this.draftPath?.endPoint}
+            nodes={this.draftPath?.nodes || []}
+            onComplete={() => this.completePath()}
+            onSave={() => this.savePath()}
             onCancel={() => this.resetMode()}
           />
         )}
@@ -191,7 +231,65 @@ export class EditorScene extends Scene {
 
   enterAddPathMode() {
     this.editMode = 'addPath';
+    this.draftPath = { nodes: [] };
+    alert('Выберите начальную точку');
     this.renderReactUI();
+  }
+
+  handlePathPointClick(pointData) {
+    if (!this.draftPath.startPoint) {
+      this.draftPath.startPoint = pointData;
+      alert('Выберите конечную точку');
+    } else if (!this.draftPath.endPoint && pointData.id !== this.draftPath.startPoint.id) {
+      this.draftPath.endPoint = pointData;
+      alert('Кликните на карте для добавления первого узла');
+    }
+    this.renderReactUI();
+  }
+
+  addNodeToDraftPath(x, y) {
+    const tileXY = this.hexGrid.board.worldXYToTileXY(x, y);
+    this.draftPath.nodes.push({ x, y, hex_q: tileXY.q, hex_r: tileXY.r, parameters: {} });
+    this.renderDraftPath();
+    alert('Кликните для следующего узла или завершите путь');
+  }
+
+  renderDraftPath() {
+    if (this.previewPath) this.previewPath.destroy();
+    this.previewPath = new Path(this, {
+      id: Date.now(),
+      start_point: this.draftPath.startPoint.id,
+      end_point: this.draftPath.endPoint?.id || this.draftPath.startPoint.id,
+      nodes: this.draftPath.nodes
+    });
+  }
+
+  completePath() {
+    if (!this.draftPath.startPoint || !this.draftPath.endPoint) {
+      alert('Выберите начальную и конечную точки!');
+      return;
+    }
+    this.draftPath.id = Date.now();
+    this.pathDataManager.saveDraft(this.draftPath);
+    this.createPath(this.draftPath);
+    this.resetMode();
+  }
+
+  createPath(pathData) {
+    const path = new Path(this, pathData);
+    this.paths.add(path);
+    return path;
+  }
+
+  async savePath() {
+    if (!this.draftPath) return;
+    try {
+      const savedPath = await this.pathDataManager.savePath(this.draftPath, true);
+      this.draftPath.id = savedPath.id;
+      this.resetMode();
+    } catch (error) {
+      alert(`Ошибка сохранения пути: ${error.message}`);
+    }
   }
 
   async saveMap() {
@@ -212,9 +310,14 @@ export class EditorScene extends Scene {
     this.newPointX = null;
     this.newPointY = null;
     this.selectedPoint = null;
+    this.draftPath = null;
     if (this.previewPoint) {
       this.previewPoint.destroy();
       this.previewPoint = null;
+    }
+    if (this.previewPath) {
+      this.previewPath.destroy();
+      this.previewPath = null;
     }
     this.renderReactUI();
   }

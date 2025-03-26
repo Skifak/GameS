@@ -6,7 +6,9 @@ const Toolbar = ({ currentHex, editMode, onAddPoint, onAddPath, onSave }) => {
       <span className="hex-info-text">
         {currentHex ? `Гекс: q=${currentHex.q}, r=${currentHex.r}` : 'Выберите гекс'}
       </span>
-      <span className="mode-text">Режим: {editMode === 'select' ? 'выбор гекса' : editMode === 'addPoint' ? 'добавление точки' : 'добавление пути'}</span>
+      <span className="mode-text">
+        Режим: {editMode === 'select' ? 'выбор гекса' : editMode === 'addPoint' ? 'добавление точки' : editMode === 'addPath' ? 'добавление пути' : 'редактирование точки'}
+      </span>
       <div className="button-container" onClick={onAddPoint}>
         <span className="button-text">Добавить точку</span>
       </div>
