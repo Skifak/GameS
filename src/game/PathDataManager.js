@@ -25,8 +25,11 @@ export class PathDataManager {
   async savePath(pathData, isNew = false) {
     try {
       const dataToSave = {
-        ...pathData,
-        nodes: pathData.nodes || []
+        id: pathData.id,
+        start_point: pathData.start_point || pathData.startPoint.id, // Используем ID начальной точки
+        end_point: pathData.end_point || pathData.endPoint.id,       // Используем ID конечной точки
+        nodes: pathData.nodes || [],
+        parameters: pathData.parameters || {}
       };
       if (isNew) {
         const { id, ...data } = dataToSave;

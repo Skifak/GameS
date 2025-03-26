@@ -270,23 +270,39 @@ export class EditorScene extends Scene {
       return;
     }
     this.draftPath.id = Date.now();
-    this.pathDataManager.saveDraft(this.draftPath);
-    this.createPath(this.draftPath);
-    this.resetMode();
+    this.pathDataManager.saveDraft({
+      id: this.draftPath.id,
+      start_point: this.draftPath.startPoint.id,
+      end_point: this.draftPath.endPoint.id,
+      nodes: this.draftPath.nodes
+    });
+    this.createPath({
+      id: this.draftPath.id,
+      start_point: this.draftPath.startPoint.id,
+      end_point: this.draftPath.endPoint.id,
+      nodes: this.draftPath.nodes
+    });
+    // Убираем resetMode(), чтобы окно оставалось открытым
+    this.renderReactUI(); // Обновляем UI, чтобы отобразить изменения
   }
 
   createPath(pathData) {
     const path = new Path(this, pathData);
-    this.paths.add(path);
+    this.paths.add(path.graphics); // Добавляем graphics вместо всего объекта
     return path;
   }
 
   async savePath() {
     if (!this.draftPath) return;
     try {
-      const savedPath = await this.pathDataManager.savePath(this.draftPath, true);
+      const savedPath = await this.pathDataManager.savePath({
+        id: this.draftPath.id,
+        start_point: this.draftPath.startPoint.id,
+        end_point: this.draftPath.endPoint.id,
+        nodes: this.draftPath.nodes
+      }, true);
       this.draftPath.id = savedPath.id;
-      this.resetMode();
+      this.resetMode(); // Закрываем окно после сохранения в Supabase
     } catch (error) {
       alert(`Ошибка сохранения пути: ${error.message}`);
     }

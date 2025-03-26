@@ -1,19 +1,19 @@
 /**
  * Рендерит пути между точками в сцене Phaser.
  * @module Path
- *//**
- * Рендерит пути между точками в сцене Phaser.
- * @module Path
  */
 import Phaser from 'phaser';
 
-export class Path {
+export class Path extends Phaser.GameObjects.GameObject {
   constructor(scene, pathData) {
-    this.scene = scene;
+    super(scene, 'Path');
     this.pathData = pathData; // { id, start_point, end_point, nodes }
     this.graphics = scene.add.graphics().setDepth(10);
     this.nodesGroup = scene.add.group();
     this.isActive = false;
+
+    // Добавляем объект в сцену
+    scene.add.existing(this);
 
     this.render();
   }
@@ -56,5 +56,6 @@ export class Path {
   destroy() {
     this.graphics.destroy();
     this.nodesGroup.destroy();
+    super.destroy();
   }
 }
