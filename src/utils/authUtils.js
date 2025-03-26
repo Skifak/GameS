@@ -1,0 +1,1 @@
+export const canEditMap = (user) => user?.profile?.role === 'admin';
