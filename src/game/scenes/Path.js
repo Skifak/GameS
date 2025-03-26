@@ -12,10 +12,9 @@ export class Path extends Phaser.GameObjects.GameObject {
     this.nodesGroup = scene.add.group();
     this.isActive = false;
 
-    // Добавляем объект в сцену
     scene.add.existing(this);
-
     this.render();
+    this.makeInteractive();
   }
 
   render() {
@@ -48,8 +47,30 @@ export class Path extends Phaser.GameObjects.GameObject {
     }
   }
 
+  makeInteractive() {
+    // Делаем линии интерактивными
+    const points = [
+      this.scene.points.getChildren().find(p => p.pointData.id === this.pathData.start_point)?.pointData,
+      ...this.pathData.nodes,
+      this.scene.points.getChildren().find(p => p.pointData.id === this.pathData.end_point)?.pointData
+    ].filter(p => p);
+
+    if (points.length < 2) return;
+
+    const hitArea = new Phaser.Geom.Polygon(points.flatMap(p => [p.x, p.y]));
+    this.graphics.setInteractive(hitArea, Phaser.Geom.Polygon.Contains);
+    this.graphics.on('pointerdown', () => {
+      this.scene.game.events.emit('path-clicked', this);
+    });
+  }
+
   setActive(active) {
     this.isActive = active;
+    this.render();
+  }
+
+  updateNode(index, x, y) {
+    this.pathData.nodes[index] = { ...this.pathData.nodes[index], x, y };
     this.render();
   }
 

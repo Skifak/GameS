@@ -28,6 +28,8 @@ export class EditorScene extends Scene {
     this.points = null;
     this.paths = null;
     this.selectedPoint = null;
+    this.selectedPath = null; // Добавляем для редактирования пути
+    this.selectedNode = null; // Добавляем для редактирования узла
     this.reactRoot = null;
     this.draftPath = null; // { startPoint, endPoint, nodes }
   }
@@ -105,6 +107,16 @@ export class EditorScene extends Scene {
       }
     });
 
+    this.game.events.on('path-clicked', (path) => {
+      if (this.editMode === 'select') {
+        this.selectedPath = path;
+        this.selectedNode = null;
+        path.setActive(true);
+        this.editMode = 'editPath';
+        this.renderReactUI();
+      }
+    });
+
     EventBus.on('hexClicked', ({ q, r }) => {
       logger.info(`[DEBUG] EventBus hexClicked received: q=${q}, r=${r}, mode=${this.editMode}`);
       if (this.editMode === 'select') {
@@ -118,7 +130,7 @@ export class EditorScene extends Scene {
       if (pointer.rightButtonDown()) {
         const worldX = pointer.x + this.cameras.main.scrollX;
         const worldY = pointer.y + this.cameras.main.scrollY;
-        const tileXY = this.hexGrid.board.tileXYToWorldXY(worldX, worldY);
+        const tileXY = this.hexGrid.board.worldXYToTileXY(worldX, worldY);
         const { q, r } = tileXY;
         const hexGraphic = this.hexGrid.hexGraphics.getChildren().find(h => h.q === q && h.r === r);
         if (hexGraphic) {
@@ -131,19 +143,28 @@ export class EditorScene extends Scene {
       }
     });
 
+    this.input.on('dragstart', (pointer, gameObject) => {
+      if (this.editMode === 'editPath' && gameObject.pathId !== undefined) {
+        this.selectedNode = { index: gameObject.nodeIndex, data: this.selectedPath.pathData.nodes[gameObject.nodeIndex] };
+        this.renderReactUI();
+      }
+    });
+
     this.input.on('drag', (pointer, gameObject, dragX, dragY) => {
-      if (this.editMode === 'select' && gameObject.pathId !== undefined) {
-        const path = this.paths.getChildren().find(p => p.pathData.id === gameObject.pathId);
+      if (this.editMode === 'editPath' && gameObject.pathId !== undefined) {
+        const path = this.paths.getChildren().find(p => p.pathId === gameObject.pathId)?.parentContainer;
         if (path) {
-          path.pathData.nodes[gameObject.nodeIndex] = {
-            ...path.pathData.nodes[gameObject.nodeIndex],
-            x: dragX,
-            y: dragY
-          };
-          path.render();
+          path.updateNode(gameObject.nodeIndex, dragX, dragY);
           this.pathDataManager.saveDraft(path.pathData);
+          this.selectedNode = { index: gameObject.nodeIndex, data: path.pathData.nodes[gameObject.nodeIndex] };
+          this.renderReactUI();
         }
       }
+    });
+
+    this.input.on('dragend', (pointer, gameObject) => {
+      this.selectedNode = null;
+      this.renderReactUI();
     });
   }
 
@@ -184,6 +205,17 @@ export class EditorScene extends Scene {
             nodes={this.draftPath?.nodes || []}
             onComplete={() => this.completePath()}
             onSave={() => this.savePath()}
+            onCancel={() => this.resetMode()}
+          />
+        )}
+        {this.editMode === 'editPath' && this.selectedPath && (
+          <PathForm
+            startPoint={this.points.getChildren().find(p => p.pointData.id === this.selectedPath.pathData.start_point)?.pointData}
+            endPoint={this.points.getChildren().find(p => p.pointData.id === this.selectedPath.pathData.end_point)?.pointData}
+            nodes={this.selectedPath.pathData.nodes}
+            selectedPath={this.selectedPath}
+            selectedNode={this.selectedNode}
+            onSave={() => this.saveEditedPath()}
             onCancel={() => this.resetMode()}
           />
         )}
@@ -302,9 +334,20 @@ export class EditorScene extends Scene {
         nodes: this.draftPath.nodes
       }, true);
       this.draftPath.id = savedPath.id;
-      this.resetMode(); // Закрываем окно после сохранения в Supabase
+      this.resetMode();
     } catch (error) {
       alert(`Ошибка сохранения пути: ${error.message}`);
+    }
+  }
+
+  async saveEditedPath() {
+    if (!this.selectedPath) return;
+    try {
+      const savedPath = await this.pathDataManager.savePath(this.selectedPath.pathData, false);
+      this.selectedPath.pathData.id = savedPath.id;
+      this.resetMode();
+    } catch (error) {
+      alert(`Ошибка сохранения изменений пути: ${error.message}`);
     }
   }
 
@@ -326,6 +369,11 @@ export class EditorScene extends Scene {
     this.newPointX = null;
     this.newPointY = null;
     this.selectedPoint = null;
+    if (this.selectedPath) {
+      this.selectedPath.setActive(false);
+      this.selectedPath = null;
+    }
+    this.selectedNode = null;
     this.draftPath = null;
     if (this.previewPoint) {
       this.previewPoint.destroy();
