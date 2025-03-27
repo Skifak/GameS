@@ -92,8 +92,8 @@ export class HexGrid {
         gridType: 'hexagonGrid',
         x: 0,
         y: 0,
-        cellWidth: 150,
-        cellHeight: 173.205, // 150 * sqrt(3)
+        cellWidth: 500,
+        cellHeight: 550, // 150 * sqrt(3)
         type: 'flat'
       },
       width: 100,

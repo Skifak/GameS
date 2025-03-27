@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 
-const PathForm = ({ startPoint, endPoint, nodes, selectedPath, selectedNode, onComplete, onSave, onCancel }) => {
+const PathForm = ({ startPoint, endPoint, nodes, selectedPath, selectedNode, onComplete, onSave, onCancel, onDelete }) => {
   const isEditMode = !!selectedPath;
 
   return (
@@ -14,7 +14,7 @@ const PathForm = ({ startPoint, endPoint, nodes, selectedPath, selectedNode, onC
         <div className="form-label">Узлы: {nodes.length}</div>
       </div>
 
-      {/* Блок свойств узла (показываем, если выбран узел) */}
+      {/* Блок свойств узла */}
       {selectedNode && (
         <div style={{ borderTop: '1px solid var(--outer-space)', paddingTop: '10px' }}>
           <div className="form-label">Выбран узел #{selectedNode.index + 1}</div>
@@ -33,6 +33,11 @@ const PathForm = ({ startPoint, endPoint, nodes, selectedPath, selectedNode, onC
       <div className="form-button-container form-button-save" onClick={onSave}>
         <span className="form-button-text">{isEditMode ? 'Сохранить изменения' : 'Сохранить путь'}</span>
       </div>
+      {isEditMode && (
+        <div className="form-button-container form-button-delete" onClick={onDelete} style={{ backgroundColor: '#ff4444' }}>
+          <span className="form-button-text">Удалить путь</span>
+        </div>
+      )}
       <div className="form-button-container form-button-cancel" onClick={onCancel}>
         <span className="form-button-text">Отмена</span>
       </div>

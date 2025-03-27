@@ -57,7 +57,7 @@ export class Game extends Scene {
     this.cameras.main.setBounds(0, 0, 2048, 2048);
     this.playerController = new PlayerController(this);
     this.cameras.main.startFollow(this.playerController.player, true, 0.1, 0.1);
-    this.cameras.main.setZoom(0.7);
+    this.cameras.main.setZoom(1.5);
 
     this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY) => {
       const newZoom = this.cameras.main.zoom - deltaY * 0.001;

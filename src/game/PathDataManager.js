@@ -39,7 +39,6 @@ export class PathDataManager {
         logger.info('Path saved:', result);
         return result;
       } else {
-        // Обновление существующего пути
         const { data: result, error } = await supabase
           .from('paths')
           .update({
@@ -53,10 +52,22 @@ export class PathDataManager {
           .single();
         if (error) throw error;
         logger.info('Path updated:', result);
-        return result; // Возвращаем обновлённые данные из Supabase
+        return result;
       }
     } catch (error) {
       logger.error('Failed to save path:', error);
+      throw error;
+    }
+  }
+
+  async deletePath(pathId) {
+    try {
+      const { error } = await supabase.from('paths').delete().eq('id', pathId);
+      if (error) throw error;
+      logger.info(`Path deleted: ${pathId}`);
+      this.paths.delete(pathId);
+    } catch (error) {
+      logger.error('Failed to delete path:', error);
       throw error;
     }
   }

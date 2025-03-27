@@ -39,7 +39,7 @@ export class EditorScene extends Scene {
   }
 
   async create() {
-    this.add.image(0, 0, 'fon').setOrigin(0, 0).setDepth(0).setScale(2048 / 1920);
+    this.add.image(0, 0, 'fon').setOrigin(0, 0).setDepth(0).setScale(2048 / 2048);
     this.cameras.main.setBounds(0, 0, 2048, 2048);
 
     await this.mapDataManager.loadData();
@@ -216,11 +216,33 @@ export class EditorScene extends Scene {
             selectedPath={this.selectedPath}
             selectedNode={this.selectedNode}
             onSave={() => this.saveEditedPath()}
+            onDelete={() => this.deletePath()} // Добавляем обработчик удаления
             onCancel={() => this.resetMode()}
           />
         )}
       </div>
     );
+  }
+
+  async deletePath() {
+    if (!this.selectedPath) return;
+    try {
+      // Сначала удаляем из Supabase
+      await this.pathDataManager.deletePath(this.selectedPath.pathData.id);
+      
+      // Удаляем путь с карты
+      this.selectedPath.destroy(); // Уничтожаем объект Path целиком
+      
+      // Удаляем из группы (если он там есть)
+      if (this.paths.getChildren().includes(this.selectedPath)) {
+        this.paths.remove(this.selectedPath);
+      }
+      
+      this.resetMode();
+    } catch (error) {
+      alert(`Ошибка удаления пути: ${error.message}`);
+      throw error; // Для отладки в консоли
+    }
   }
 
   enterAddPointMode() {
@@ -320,7 +342,7 @@ export class EditorScene extends Scene {
 
   createPath(pathData) {
     const path = new Path(this, pathData);
-    this.paths.add(path.graphics); // Добавляем graphics вместо всего объекта
+    this.paths.add(path); // Изменяем: добавляем сам объект Path, а не только graphics
     return path;
   }
 
