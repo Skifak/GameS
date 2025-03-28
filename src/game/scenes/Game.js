@@ -12,6 +12,8 @@ import { GameStateManager } from '../GameStateManager';
 import { MessageHandler } from '../MessageHandler';
 import { PlayerController } from '../../components/PlayerController';
 import { HexGrid } from './HexGrid';
+import { CommandSender } from '../CommandSender';
+import logger from '../../utils/logger';
 
 /**
  * Главная сцена игры.
@@ -27,19 +29,14 @@ export class Game extends Scene {
     this.playerController = null;
     this.hexGrid = null;
     this.gameStateManager = null;
+    this.commandSender = null;
+    this.activePath = null;
   }
 
-  /**
-   * Загружает ресурсы перед созданием сцены. Сейчас загружает только фоновое изображение.
-   */
   preload() {
     this.load.image('fon', 'assets/fon.jpg');
   }
 
-  /**
-   * Создаёт сцену игры, инициализирует менеджеры и сетку.
-   * @async
-   */
   async create() {
     let background;
     if (this.textures.exists('fon')) {
@@ -74,22 +71,32 @@ export class Game extends Scene {
     );
     await this.gameStateManager.init();
 
-    this.hexGrid = new HexGrid(this, this.connectionManager.getRoom(), this.mapDataManager);
+    const room = this.connectionManager.getRoom();
+    logger.info('Room in Game.js:', room ? room.id : 'null');
+
+    this.hexGrid = new HexGrid(this, room, this.mapDataManager);
     await this.hexGrid.initGrid();
 
+    this.commandSender = new CommandSender(room);
+    logger.info('CommandSender initialized with room:', room ? room.id : 'null');
+
     new MessageHandler(
-      this.connectionManager.getRoom(),
+      room,
       this.gameStateManager,
       null,
       () => this.connectionManager.reconnect(),
       this.hexGrid
     );
 
+    this.game.events.on('path-clicked', (path) => {
+      this.activePath = path;
+      this.hexGrid.renderPaths([path.pathData], true);
+    });
+
     EventBus.emit('current-scene-ready', this);
   }
 
-  /**
-   * Обновляет состояние сцены (пока пусто).
-   */
-  update() {}
+  update() {
+    // Убираем updateMarker() из цикла update
+  }
 }

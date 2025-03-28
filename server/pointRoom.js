@@ -7,26 +7,16 @@ import { Schema, defineTypes } from '@colyseus/schema';
 import { createClient } from '@supabase/supabase-js';
 import logger from './logger.js';
 
-/**
- * Схема данных игрока в комнате. Содержит идентификатор, имя пользователя и координаты.
- * @class
- * @extends Schema
- */
 class Player extends Schema {
   constructor() {
     super();
     this.playerId = "";
     this.username = "";
-    this.q = 0;
-    this.r = 0;
+    this.x = 0;
+    this.y = 0;
   }
 }
 
-/**
- * Схема состояния комнаты.
- * @class
- * @extends Schema
- */
 class State extends Schema {
   constructor() {
     super();
@@ -37,19 +27,14 @@ class State extends Schema {
 defineTypes(Player, {
   playerId: "string",
   username: "string",
-  q: "number",
-  r: "number"
+  x: "number",
+  y: "number"
 });
 
 defineTypes(State, {
   players: { map: Player }
 });
 
-/**
- * Класс комнаты Colyseus для управления точками.
- * @class
- * @extends Room
- */
 export class PointRoom extends Room {
   constructor() {
     super();
@@ -58,33 +43,22 @@ export class PointRoom extends Room {
     this.redisService = null;
   }
 
-  /**
-   * Инициализирует комнату с переданными параметрами.
-   * @param {Object} options - Опции создания комнаты
-   * @param {string} options.supabaseUrl - URL Supabase
-   * @param {string} options.anonKey - Анонимный ключ Supabase
-   * @param {RedisService} options.redisService - Сервис Redis
-   */
   onCreate(options) {
     this.supabaseUrl = options.supabaseUrl;
     this.anonKey = options.anonKey;
     this.redisService = options.redisService;
     this.setState(new State());
     logger.info(`PointRoom created`);
-    
+
     this.onMessage('moveToHex', (client, message) => {
       this.handleMoveToHex(client, message.q, message.r);
     });
+
+    this.onMessage('moveToNode', (client, message) => {
+      this.handleMoveToNode(client, message.pathId, message.nodeIndex);
+    });
   }
 
-  /**
-   * Аутентифицирует клиента через Supabase.
-   * @async
-   * @param {Object} client - Клиент Colyseus
-   * @param {Object} options - Опции подключения
-   * @returns {Object} Данные пользователя и профиля
-   * @throws {Error} Если аутентификация не удалась
-   */
   async onAuth(client, options) {
     if (!options || !options.token) throw new Error('No token provided');
     const supabase = createClient(this.supabaseUrl, this.anonKey, {
@@ -105,13 +79,6 @@ export class PointRoom extends Room {
     return { user, profile, token: options.token };
   }
 
-  /**
-   * Обрабатывает присоединение клиента к комнате.
-   * @async
-   * @param {Object} client - Клиент Colyseus
-   * @param {Object} options - Опции подключения
-   * @param {Object} auth - Данные аутентификации
-   */
   async onJoin(client, options, auth) {
     const supabase = createClient(this.supabaseUrl, this.anonKey, {
       global: { headers: { Authorization: `Bearer ${options.token}` } }
@@ -119,7 +86,7 @@ export class PointRoom extends Room {
 
     const { data: profile, error } = await supabase
       .from('profiles')
-      .select('current_hex_q, current_hex_r')
+      .select('current_point_id, current_path_id, current_node_index')
       .eq('id', auth.user.id)
       .single();
     if (error) throw error;
@@ -127,28 +94,38 @@ export class PointRoom extends Room {
     const player = new Player();
     player.playerId = auth.user.id;
     player.username = auth.profile.username;
-    player.q = profile.current_hex_q || 0;
-    player.r = profile.current_hex_r || 0;
+
+    if (profile.current_path_id && profile.current_node_index !== null) {
+      const { data: path } = await supabase
+        .from('paths')
+        .select('nodes')
+        .eq('id', profile.current_path_id)
+        .single();
+      const nodes = path.nodes;
+      player.x = nodes[profile.current_node_index].x;
+      player.y = nodes[profile.current_node_index].y;
+    } else if (profile.current_point_id) {
+      const { data: point } = await supabase
+        .from('points_of_interest')
+        .select('x, y')
+        .eq('id', profile.current_point_id)
+        .single();
+      player.x = point.x;
+      player.y = point.y;
+    }
 
     this.state.players.set(client.sessionId, player);
 
     await this.redisService.setPlayerSession(client.sessionId, {
-      q: player.q,
-      r: player.r,
+      x: player.x,
+      y: player.y,
       username: player.username,
       status: 'active'
     });
 
-    logger.info(`Player ${auth.profile.username} joined PointRoom ${this.roomId} at q:${player.q}, r:${player.r}`);
+    logger.info(`Player ${auth.profile.username} joined PointRoom ${this.roomId} at x:${player.x}, y:${player.y}`);
   }
 
-  /**
-   * Обрабатывает перемещение игрока на новый гекс.
-   * @async
-   * @param {Object} client - Клиент Colyseus
-   * @param {number} q - Координата q гекса
-   * @param {number} r - Координата r гекса
-   */
   async handleMoveToHex(client, q, r) {
     const supabase = createClient(this.supabaseUrl, this.anonKey, {
       global: { headers: { Authorization: `Bearer ${client.auth?.token || this.anonKey}` } }
@@ -169,11 +146,11 @@ export class PointRoom extends Room {
         return;
       }
 
-      player.q = q;
-      player.r = r;
+      const worldXY = this.board.tileXYToWorldXY(q, r);
+      player.x = worldXY.x;
+      player.y = worldXY.y;
 
-      // Сохраняем позицию в Supabase с отладкой
-      logger.info(`Attempting to update Supabase for player ${player.playerId} to q:${q}, r:${r}`);
+      logger.info(`Attempting to update Supabase for player ${player.playerId} to x:${player.x}, y:${player.y}`);
       const { data: updateData, error: updateError } = await supabase
         .from('profiles')
         .update({ current_hex_q: q, current_hex_r: r })
@@ -183,26 +160,81 @@ export class PointRoom extends Room {
       logger.info(`Supabase updated successfully for player ${player.playerId}: ${JSON.stringify(updateData)}`);
 
       await this.redisService.setPlayerSession(client.sessionId, {
-        q: player.q,
-        r: player.r,
+        x: player.x,
+        y: player.y,
         username: player.username,
         status: 'active'
       });
 
-      client.send('playerMoved', { q, r });
-      logger.info(`Player ${player.playerId} moved to hex q:${q}, r:${r}`);
+      client.send('playerMoved', { x: player.x, y: player.y });
+      logger.info(`Player ${player.playerId} moved to hex x:${player.x}, y:${player.y}`);
     } catch (error) {
       logger.error(`Move to hex q:${q}, r:${r} failed: ${error.message}`);
       client.send('error', { message: 'Move failed: ' + error.message });
     }
   }
 
-  /**
-   * Обрабатывает выход клиента из комнаты.
-   * @async
-   * @param {Object} client - Клиент Colyseus
-   * @param {boolean} consented - Было ли отключение добровольным
-   */
+  async handleMoveToNode(client, pathId, nodeIndex) {
+    const supabase = createClient(this.supabaseUrl, this.anonKey, {
+      global: { headers: { Authorization: `Bearer ${client.auth?.token || this.anonKey}` } }
+    });
+
+    try {
+      logger.info(`Handling moveToNode for client ${client.sessionId}: pathId=${pathId}, nodeIndex=${nodeIndex}`);
+      const { data: path, error } = await supabase
+        .from('paths')
+        .select('nodes, end_point')
+        .eq('id', pathId)
+        .single();
+      if (error || !path) throw new Error('Path not found');
+
+      const player = this.state.players.get(client.sessionId);
+      if (!player) throw new Error('Player not found');
+
+      const nodes = path.nodes;
+      if (nodeIndex < 0 || nodeIndex >= nodes.length) {
+        if (nodeIndex === nodes.length) {
+          // Достигнут end_point
+          const { data: point } = await supabase
+            .from('points_of_interest')
+            .select('x, y')
+            .eq('id', path.end_point)
+            .single();
+          player.x = point.x;
+          player.y = point.y;
+          await supabase
+            .from('profiles')
+            .update({ current_point_id: path.end_point, current_path_id: null, current_node_index: null })
+            .eq('id', player.playerId);
+          logger.info(`Player ${player.playerId} reached end_point ${path.end_point} at x:${player.x}, y:${player.y}`);
+        } else {
+          throw new Error('Invalid node index');
+        }
+      } else {
+        player.x = nodes[nodeIndex].x;
+        player.y = nodes[nodeIndex].y;
+        await supabase
+          .from('profiles')
+          .update({ current_path_id: pathId, current_node_index: nodeIndex })
+          .eq('id', player.playerId);
+        logger.info(`Player ${player.playerId} moved to node ${nodeIndex} on path ${pathId} at x:${player.x}, y:${player.y}`);
+      }
+
+      await this.redisService.setPlayerSession(client.sessionId, {
+        x: player.x,
+        y: player.y,
+        username: player.username,
+        status: 'active'
+      });
+
+      client.send('playerMoved', { x: player.x, y: player.y });
+      logger.info(`Sent playerMoved to client ${client.sessionId}: x=${player.x}, y=${player.y}`);
+    } catch (error) {
+      logger.error(`Move to node failed: ${error.message}`);
+      client.send('error', { message: 'Move failed: ' + error.message });
+    }
+  }
+
   async onLeave(client, consented) {
     const player = this.state.players.get(client.sessionId);
     if (player) {

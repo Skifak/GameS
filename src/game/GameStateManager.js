@@ -19,7 +19,7 @@ export class GameStateManager {
     this.playerController = playerController;
     this.uiManager = uiManager;
     this.supabase = supabase;
-    this.player = { id: null, username: null, q: 0, r: 0 };
+    this.player = { id: null, username: null, x: 0, y: 0 };
     this.room = null;
     this.setupListeners();
   }
@@ -45,14 +45,47 @@ export class GameStateManager {
       // Загружаем текущую позицию из profiles
       const { data: profile, error } = await this.supabase
         .from('profiles')
-        .select('current_hex_q, current_hex_r')
+        .select('current_point_id, current_path_id, current_node_index')
         .eq('id', this.player.id)
         .single();
       if (error) {
         logger.error(`Failed to load profile: ${error.message}`);
       } else {
-        this.player.q = profile.current_hex_q || 0;
-        this.player.r = profile.current_hex_r || 0;
+        const { current_point_id, current_path_id, current_node_index } = profile;
+        let x, y;
+        if (current_path_id && current_node_index !== null) {
+          // Игрок на узле пути
+          const { data: path, error: pathError } = await this.supabase
+            .from('paths')
+            .select('nodes')
+            .eq('id', current_path_id)
+            .single();
+          if (pathError) {
+            logger.error(`Failed to load path: ${pathError.message}`);
+          } else {
+            const nodes = path.nodes;
+            x = nodes[current_node_index].x;
+            y = nodes[current_node_index].y;
+          }
+        } else if (current_point_id) {
+          // Игрок на точке
+          const { data: point, error: pointError } = await this.supabase
+            .from('points_of_interest')
+            .select('x, y')
+            .eq('id', current_point_id)
+            .single();
+          if (pointError) {
+            logger.error(`Failed to load point: ${pointError.message}`);
+          } else {
+            x = point.x;
+            y = point.y;
+          }
+        }
+        if (x && y) {
+          this.player.x = x;
+          this.player.y = y;
+          this.playerController.updatePosition({ x, y }, false);
+        }
       }
     }
 
@@ -79,7 +112,7 @@ export class GameStateManager {
         this.room.onStateChange.once((state) => {
           const playerData = state.players.get(this.room.sessionId);
           if (playerData) {
-            this.updatePlayerPosition(playerData.q, playerData.r, false);
+            this.updatePlayerPosition(playerData.x, playerData.y, false);
           }
           resolve();
         });
@@ -93,15 +126,15 @@ export class GameStateManager {
 
   /**
    * Обновляет позицию игрока на карте.
-   * @param {number} q - Координата q гекса
-   * @param {number} r - Координата r гекса
+   * @param {number} x - Координата x
+   * @param {number} y - Координата y
    * @param {boolean} [useTween=false] - Использовать ли анимацию
    */
-  updatePlayerPosition(q, r, useTween = false) {
-    this.player.q = q;
-    this.player.r = r;
-    this.playerController.updatePosition({ q, r }, useTween);
-    logger.info(`Player position updated to q:${q}, r:${r}`);
+  updatePlayerPosition(x, y, useTween = false) {
+    this.player.x = x;
+    this.player.y = y;
+    this.playerController.updatePosition({ x, y }, useTween);
+    logger.info(`Player position updated to x:${x}, y:${y}`);
   }
 
   /**

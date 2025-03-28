@@ -76,6 +76,9 @@ export class ConnectionManager {
     this.room = null;
     await this.connect(this.currentPointId);
     logger.info(`Reconnected to point ${this.currentPointId}`);
+
+    logger.info('Attempting to reconnect...');
+    await this.connect(1);
   }
   
   /**

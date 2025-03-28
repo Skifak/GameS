@@ -3,11 +3,12 @@
  * @module Path
  */
 import Phaser from 'phaser';
+import { EventBus } from '../EventBus';
 
 export class Path extends Phaser.GameObjects.GameObject {
   constructor(scene, pathData) {
     super(scene, 'Path');
-    this.pathData = pathData; // { id, start_point, end_point, nodes }
+    this.pathData = pathData;
     this.graphics = scene.add.graphics().setDepth(10);
     this.nodesGroup = scene.add.group();
     this.isActive = false;
@@ -21,8 +22,8 @@ export class Path extends Phaser.GameObjects.GameObject {
     this.graphics.clear();
     this.nodesGroup.clear(true, true);
 
-    const lineWidth = this.isActive ? 5 : 3;
-    this.graphics.lineStyle(lineWidth, 0xffffff, 1); // --white
+    const lineWidth = this.isActive ? 4 : 3;
+    this.graphics.lineStyle(lineWidth, 0xffffff, 1);
 
     const startPoint = this.scene.points.getChildren().find(p => p.pointData.id === this.pathData.start_point)?.pointData;
     const endPoint = this.scene.points.getChildren().find(p => p.pointData.id === this.pathData.end_point)?.pointData;
@@ -36,10 +37,14 @@ export class Path extends Phaser.GameObjects.GameObject {
       this.graphics.lineTo(points[i + 1].x, points[i + 1].y);
       this.graphics.strokePath();
 
-      if (i < points.length - 2) { // Узлы (кроме start и end)
-        const node = this.scene.add.circle(points[i + 1].x, points[i + 1].y, 5, 0x4B712E).setDepth(11); // --green
+      if (i < points.length - 2) {
+        const node = this.scene.add.circle(points[i + 1].x, points[i + 1].y, 5, 0x4B712E).setDepth(11);
         node.setInteractive();
-        this.scene.input.setDraggable(node);
+        node.on('pointerdown', () => {
+          EventBus.emit('moveToNode', { pathId: this.pathData.id, nodeIndex: i });
+        });
+        node.on('pointerover', () => node.setScale(1.2));
+        node.on('pointerout', () => node.setScale(1));
         node.pathId = this.pathData.id;
         node.nodeIndex = i;
         this.nodesGroup.add(node);
@@ -62,6 +67,8 @@ export class Path extends Phaser.GameObjects.GameObject {
     this.graphics.on('pointerdown', () => {
       this.scene.game.events.emit('path-clicked', this);
     });
+    this.graphics.on('pointerover', () => this.graphics.lineStyle(4, 0xffffff, 1));
+    this.graphics.on('pointerout', () => this.graphics.lineStyle(3, 0xffffff, 1));
   }
 
   setActive(active) {
