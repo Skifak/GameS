@@ -42,7 +42,8 @@
         "rag:md": "jsdoc2md src/**/*.js src/**/*.jsx src/**/*.ts > docs/api.md",
         "rag:json": "markdown-json",
         "build:path": "node json-project/scripts/build-structure.js",
-        "build:code": "node json-project/scripts/minify-code.js"
+        "build:code": "node json-project/scripts/minify-code.js",
+        "gen": "node code-analyzer.js -i src -o mermaid -e .js,.jsx,.ts,.tsx"
     },
     "dependencies": {
         "@colyseus/monitor": "^0.16.6",
@@ -73,12 +74,16 @@
     "devDependencies": {
         "@types/react": "^18.3.3",
         "@types/react-dom": "^18.3.0",
+        "@typescript-eslint/typescript-estree": "^8.28.0",
         "@vitejs/plugin-react": "^4.3.1",
+        "acorn": "^8.14.1",
         "chalk": "^5.4.1",
         "clean-jsdoc-theme": "^4.3.0",
         "cli-cursor": "^5.0.0",
+        "commander": "^13.1.0",
         "concurrently": "^8.2.2",
         "cross-env": "^7.0.3",
+        "enquirer": "^2.4.1",
         "eslint": "^8.57.0",
         "eslint-plugin-react": "^7.34.2",
         "eslint-plugin-react-hooks": "^4.6.2",
